@@ -122,7 +122,10 @@ export async function POST(req: NextRequest) {
     terrainResource:
       typeof data.terrainResource === "string" ? data.terrainResource : "",
   };
-  const metaJson = JSON.stringify(meta);
+  // sql.json() is required for JSON params: the postgres driver JSON-
+  // stringifies plain-string params again, so `${string}::jsonb` stores a
+  // double-encoded jsonb *string* instead of the object (neon parsed it).
+  const metaJson = sql.json(meta as never);
 
   try {
     await ensureSchema();

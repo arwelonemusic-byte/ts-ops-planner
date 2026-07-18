@@ -20,7 +20,10 @@ export async function POST(req: NextRequest) {
   }
 
   const data = body as Record<string, unknown>;
-  const payload = JSON.stringify(data);
+  // sql.json() is required for JSON params: the postgres driver JSON-
+  // stringifies plain-string params again, so `${string}::jsonb` stores a
+  // double-encoded jsonb *string* instead of the object (neon parsed it).
+  const payload = sql.json(data as never);
 
   if (typeof data.code === "string") {
     if (!isValidCode(data.code)) {

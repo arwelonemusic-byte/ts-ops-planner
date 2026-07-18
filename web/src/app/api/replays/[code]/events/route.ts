@@ -37,7 +37,6 @@ export async function POST(
     );
   }
 
-  const eventsJson = JSON.stringify(data.events);
   // Optional plan code stamped by the mod when /syncplan fires during the
   // session (see TS_ReplayRecorder.SetPlanCode). Last-wins — every flush
   // re-asserts the current code, so a second /syncplan overwrites the prior.
@@ -51,18 +50,21 @@ export async function POST(
   try {
     // Two-branch query so we don't run jsonb_set with a null when no plan
     // code is provided. Both branches share the same events append.
+    // sql.json() is required for JSON params: the postgres driver JSON-
+    // stringifies plain-string params again, so `${string}::jsonb` stores a
+    // double-encoded jsonb *string* instead of the array (neon parsed it).
     const result = planCode
       ? await sql`
           UPDATE replays
           SET
-            events = events || ${eventsJson}::jsonb,
+            events = events || ${sql.json(data.events as never)}::jsonb,
             meta = jsonb_set(meta, '{planCode}', to_jsonb(${planCode}::text))
           WHERE code = ${code}
           RETURNING jsonb_array_length(events) AS event_count
         `
       : await sql`
           UPDATE replays
-          SET events = events || ${eventsJson}::jsonb
+          SET events = events || ${sql.json(data.events as never)}::jsonb
           WHERE code = ${code}
           RETURNING jsonb_array_length(events) AS event_count
         `;
