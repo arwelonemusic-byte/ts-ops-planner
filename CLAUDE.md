@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The web app (`./web/`) is the shared frontend + HTTP backend for **two complementary Enfusion mods**, both authored in Workbench so they live outside this repo:
 
-1. **`./web/`** — Next.js 16 + React 19 + TypeScript + Tailwind 4 + Neon Postgres. Planning UI **and** replay viewer **and** HTTP backend (`/api/plans/*` and `/api/replays/*`).
+1. **`./web/`** — Next.js 16 + React 19 + TypeScript + Tailwind 4 + PostgreSQL (self-hosted). Planning UI **and** replay viewer **and** HTTP backend (`/api/plans/*` and `/api/replays/*`). Production runs at **https://planner.tacticalshift.ru** on the Selectel box (`91.206.15.125`, also the game server) — systemd unit `ts-ops-planner` on `127.0.0.1:3003` behind Caddy, DB `ops_planner` in the box-local PostgreSQL 14. Migrated off Vercel + Neon 2026-07-18 (RU TSPU throttling).
 2. **`C:\Users\djdav\Documents\My Games\ArmaReforgerWorkbench\addons\TS Ops Planner\`** — the Enfusion mod that consumes **plans** from the backend. Mod ID `TSOpsPlanner`, GUID `691C96B596D0E373`. Scripts at `Scripts/Game/TS_OpsPlanner/`. Depends on `TS Better Markers` (GUID `686B4A229ED16D71`) for the extended custom-icon set.
 3. **`C:\Users\djdav\Documents\My Games\ArmaReforgerWorkbench\addons\TS Replay\`** — the Enfusion mod that **records** gameplay (positions, shots, vehicles, life-states) and POSTs replay events to the backend. Scripts at `Scripts/Game/TS_Replay/`. Recording starts automatically when the server boots — there's no admin command equivalent to `/syncplan`. The web app's "Replay" mode loads + plays back any code stored in the `replays` table.
 
@@ -36,21 +36,19 @@ All `npm` commands run from `./web/`.
 npm run dev        # local dev server at http://localhost:3000
 npm run build      # production build + type check — use this to validate code changes before deploy
 npm run lint       # eslint (Next.js config)
-npx vercel deploy --prod --archive=tgz    # deploy to production, aliases https://ts-ops-planner-web.vercel.app
-                            # --archive=tgz is mandatory: Zimnitrita's tile pyramid (5715 files)
-                            # exceeds Vercel's free-tier 5000-file-per-deployment upload cap.
-                            # Without the flag, deploys fail with api-upload-free / 24h cooldown.
 ```
 
-Backend tests are curl round-trips — there is no test suite yet. POST is behind Basic Auth (`PLANNER_USER`/`PLANNER_PASS` env vars on Vercel); GET is public (the 6-char code is the capability token, so the mod ships no secret).
+Deploy: push to `master` on `github.com/arwelonemusic-byte/ts-ops-planner` (public repo — `Assets/` and `web/public/dev-fixtures/` stay untracked), then on the box run `/opt/ts-web/deploy-ops-planner.sh` (git pull → npm ci → build → restart). Env lives in `/etc/ts-ops-planner.env` (mode 600), never in the repo. The old Vercel flow (`npx vercel deploy --prod --archive=tgz`) is retired.
+
+Backend tests are curl round-trips — there is no test suite yet. POST is behind Basic Auth (`PLANNER_USER`/`PLANNER_PASS` from the env file); GET is public (the 6-char code is the capability token, so the mod ships no secret).
 
 ```bash
 # POST mints a fresh code server-side; client-supplied codes are still supported for repeat-push iteration (upsert).
-curl -sS -u "$PLANNER_USER:$PLANNER_PASS" -X POST https://ts-ops-planner-web.vercel.app/api/plans \
+curl -sS -u "$PLANNER_USER:$PLANNER_PASS" -X POST https://planner.tacticalshift.ru/api/plans \
   -H "Content-Type: application/json" \
   -d '{"schemaVersion":1,"markers":[{"kind":"custom","worldX":2000,"worldY":2000,"text":"Test"}]}'
 # GET needs no auth:
-curl -sS https://ts-ops-planner-web.vercel.app/api/plans/<code>
+curl -sS https://planner.tacticalshift.ru/api/plans/<code>
 ```
 
 The mod has no test suite either. Acceptance is "load a scenario with `TS_OpsPlannerSyncComponent` attached to the GameMode in Workbench Play mode, observe marker at expected world coords on the in-game map." Console log prefix is `[TS_OpsPlanner]` — grep for it when diagnosing. The Replay mod uses `[TS_Replay]`.
@@ -59,9 +57,9 @@ Replay endpoints (GET-only is public; POST is recorder-only and goes through Bas
 
 ```bash
 # Inspect events directly (paginated, default chunk size 20000):
-curl -sS "https://ts-ops-planner-web.vercel.app/api/replays/<CODE>?offset=0&limit=20000" | jq .events
+curl -sS "https://planner.tacticalshift.ru/api/replays/<CODE>?offset=0&limit=20000" | jq .events
 # List N most recent replays for the dropdown:
-curl -sS "https://ts-ops-planner-web.vercel.app/api/replays?recent=10"
+curl -sS "https://planner.tacticalshift.ru/api/replays?recent=10"
 ```
 
 ---
@@ -259,7 +257,7 @@ The menu-dots dropdown in the tool switcher has a "Map" section that auto-popula
 - **React 19 strict mode runs `useState` updaters twice in dev.** Updaters must be pure — calling `setOther(...)` inside `setX((v) => ...)` fires the side-effect setter twice and trips "Maximum update depth exceeded". Compute next state purely; react to it in a separate `useEffect`.
 - **`useEffect` dep arrays must not include raw JSX values** (e.g. `currentPanelBody`). JSX nodes are fresh references each render, so the effect re-runs every render and any state-setting inside cascades into a render storm. Use a derived boolean (`!!currentPanelBody`) when only mount state matters.
 - **react-leaflet `<Tooltip>` doesn't survive per-frame `setIcon` swaps.** Replay chars/vehicles update their DivIcon every RAF tick (yaw + position); `marker.setIcon(newIcon)` destroys + recreates the DOM element and Leaflet's tooltip close logic loses track, leaving hover labels stuck. Inline the hover label into the DivIcon HTML and gate via CSS `:hover` instead (see `.ts-replay-name-hover` / `.ts-replay-veh-hover` in `globals.css`). CSS re-evaluates against whichever element is mounted now — stale state is impossible by construction.
-- **`vercel env pull` defaults to development scope.** Pass `--environment=production .env.local` to pull prod secrets; the default returns empty values for `DATABASE_URL` and other prod-only vars.
+- **`vercel env pull` defaults to development scope** (historical — app is off Vercel since 2026-07-18). Sensitive-flagged vars pull back empty in *any* scope; the old Neon `DATABASE_URL` was only retrievable from the Neon console.
 - **Git Bash mangles `/PID`-style flags** into absolute paths (`/PID` → `C:/Program Files/Git/PID`). Use double-slash (`taskkill //F //PID <n>`) or prefix the command with `MSYS_NO_PATHCONV=1`.
 - **Orphaned `next dev` symptom**: `GET /api/replays?recent=N` returns 200 but `GET /api/replays/[code]` returns 500 with `Jest worker encountered N child process exceptions` in the log. The orphan process is alive but its API-route worker pool is dead — kill the PID Next.js reports in its "Another next dev server is already running" message, then restart.
 - **`web/public/dev-fixtures/<CODE>.json` are served by `lib/replayFixtures.ts` when `DATABASE_URL` is empty.** Drop a payload from prod `/api/replays/<code>?offset=0&limit=N` (merged across chunks) to add a new fixture; recent-list and detail endpoints both fall back to fixtures automatically.
@@ -360,7 +358,7 @@ The panel UI is designed to match Figma file `hHh1bKwcTXbhuwOVnoP1ZL`. Key token
 
 ## Data model at a glance
 
-Two tables in Neon, one row per saved artefact each:
+Two tables in the box-local PostgreSQL (database `ops_planner`), one row per saved artefact each:
 
 ```
 plans(   code TEXT PRIMARY KEY, data JSONB NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())
