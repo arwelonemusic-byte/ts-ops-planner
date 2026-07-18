@@ -11,7 +11,7 @@
   "dependencies": {
     "@types/three": "^0.184.1",
     "leaflet": "^1.9.4",
-    "next": "16.2.3",
+    "next": "^16.2.10",
     "postgres": "^3.4.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",
