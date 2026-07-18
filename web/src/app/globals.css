@@ -1,0 +1,226 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-roboto);
+  --font-slab: var(--font-roboto-slab);
+}
+
+body {
+  font-family: var(--font-roboto), Arial, Helvetica, sans-serif;
+}
+
+/* Default cursor for all enabled buttons + labels with a role of switch /
+ * checkbox / radio. Tailwind v4 preflight resets `button` to the browser
+ * default cursor; this overrides it. Wrapped in @layer base so Lightning
+ * CSS doesn't optimize the rule away (same issue we hit with .ts-slider). */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="switch"]:not([aria-disabled="true"]),
+  [role="radio"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  [role="menuitem"],
+  [role="option"],
+  label:has(input[type="checkbox"]:not(:disabled)),
+  label:has(input[type="radio"]:not(:disabled)),
+  summary {
+    cursor: pointer;
+  }
+  button:disabled,
+  [role="button"][aria-disabled="true"],
+  [role="switch"][aria-disabled="true"],
+  [role="radio"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+}
+
+/* Crosshair on the map container only — unlike Leaflet's built-in
+ * `.leaflet-crosshair`, this does NOT override the pointer cursor on
+ * `.leaflet-interactive` children. So hovering over a selectable marker or
+ * line still shows pointer, signalling selectability. !important beats
+ * `.leaflet-grab`'s default grab cursor. */
+.leaflet-container.ts-cursor-crosshair {
+  cursor: crosshair !important;
+}
+
+/* Replay hover badges — inlined into the marker's DivIcon HTML and
+ * gated with CSS :hover, NOT react-leaflet's <Tooltip>. The tooltip
+ * lifecycle race'd setIcon every frame during playback and left
+ * tooltips stuck open after hover-out. CSS :hover re-evaluates against
+ * whichever element is mounted right now, so the stale-state class of
+ * bug is impossible by construction. Styling mirrors the permanent name
+ * label baked into the triangle DivIcon (rgba(32,36,39,0.85), white
+ * text, 500 11px Roboto) so on-hover and toggled-on labels read
+ * identically. */
+.ts-replay-char,
+.ts-replay-veh {
+  position: relative;
+  width: 0;
+  height: 0;
+}
+.ts-replay-name-label,
+.ts-replay-name-hover {
+  position: absolute;
+  left: 14px;
+  top: -8px;
+  white-space: nowrap;
+  background: rgba(32, 36, 39, 0.85);
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font: 500 11px var(--font-roboto), ui-sans-serif, system-ui;
+  pointer-events: none;
+}
+.ts-replay-name-hover {
+  display: none;
+}
+.ts-replay-char:hover .ts-replay-name-hover {
+  display: block;
+}
+.ts-replay-veh-hover {
+  position: absolute;
+  left: 16px;
+  top: -16px;
+  white-space: nowrap;
+  background: rgba(32, 36, 39, 0.85);
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font: 500 11px var(--font-roboto), ui-sans-serif, system-ui;
+  pointer-events: none;
+  display: none;
+}
+.ts-replay-veh-hover > div {
+  line-height: 14px;
+}
+.ts-replay-veh:hover .ts-replay-veh-hover {
+  display: block;
+}
+
+/* Event-log new-event flash — applied for ~1s as a row becomes the
+ * "current" entry. Wrapped in @layer base for the same Lightning CSS
+ * reason as .ts-slider (unlayered keyframe rules get dropped). */
+@layer base {
+  @keyframes log-flash {
+    0% {
+      background-color: rgba(244, 219, 80, 0.18);
+    }
+    100% {
+      background-color: transparent;
+    }
+  }
+  .log-flash {
+    animation: log-flash 1000ms ease-out;
+  }
+
+  /* Slim scrollbar matching the dark panel theme. Applied via .ts-thin-
+   * scrollbar so we don't restyle other surfaces that may want the OS
+   * default (modals, document body). */
+  .ts-thin-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #2e3439 transparent;
+  }
+  .ts-thin-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .ts-thin-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .ts-thin-scrollbar::-webkit-scrollbar-thumb {
+    background: #2e3439;
+    border-radius: 3px;
+  }
+  .ts-thin-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #3a4249;
+  }
+}
+
+/* Shared slider styling — matches Figma node 67:191. Track is a 10px dark
+ * pill (#14181A), no border; thumb is a 16px brand-yellow circle.
+ *
+ * Wrapped in @layer base because Tailwind v4's Lightning CSS optimizer
+ * silently drops vendor-prefixed pseudo-elements (::-webkit-slider-thumb
+ * etc.) from unlayered CSS when its target browser set wouldn't need the
+ * prefix — except those pseudos have no unprefixed equivalent, so dropping
+ * them leaves the input unstyled (default OS blue fill bleeds through).
+ * The @layer wrapper prevents the optimizer from touching these rules.
+ * Apply via `className="ts-slider"` on any `<input type="range">`.
+ */
+@layer base {
+  .ts-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    height: 16px;
+    cursor: pointer;
+    outline: none;
+    /* Suppress the OS accent-color fill on the left of the thumb. Chromium
+     * applies it on top of the track background otherwise, painting that
+     * pre-thumb region blue regardless of the runnable-track styling. */
+    accent-color: transparent;
+  }
+  .ts-slider:focus {
+    outline: none;
+  }
+  /* Track paints the "completed" portion with a brand-yellow @ 24% opacity
+   * fill from 0 → --ts-slider-pct, and the dark track from there to the end.
+   * The percentage is driven by an inline style at each call site (see
+   * sliderProgressStyle in page.tsx). Default 0% if the variable is unset,
+   * matching the unfilled look. */
+  .ts-slider::-webkit-slider-runnable-track {
+    height: 10px;
+    background: linear-gradient(
+      to right,
+      rgba(244, 219, 80, 0.24) 0%,
+      rgba(244, 219, 80, 0.24) var(--ts-slider-pct),
+      #14181a var(--ts-slider-pct),
+      #14181a 100%
+    );
+    border-radius: 99px;
+    border: none;
+  }
+  .ts-slider::-moz-range-track {
+    height: 10px;
+    background: linear-gradient(
+      to right,
+      rgba(244, 219, 80, 0.24) 0%,
+      rgba(244, 219, 80, 0.24) var(--ts-slider-pct),
+      #14181a var(--ts-slider-pct),
+      #14181a 100%
+    );
+    border-radius: 99px;
+    border: none;
+  }
+  .ts-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #f4db50;
+    border: none;
+    /* Center the 16px thumb over the 10px track: (16-10)/2 = 3px negative
+     * margin. Without this the thumb sits at the track's top edge. */
+    margin-top: -3px;
+    cursor: pointer;
+  }
+  .ts-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #f4db50;
+    border: none;
+    cursor: pointer;
+  }
+  .ts-slider:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .ts-slider:disabled::-webkit-slider-thumb {
+    cursor: not-allowed;
+  }
+  .ts-slider:disabled::-moz-range-thumb {
+    cursor: not-allowed;
+  }
+}

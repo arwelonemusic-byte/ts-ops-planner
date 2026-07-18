@@ -1,0 +1,9 @@
+# Raw map captures, stitches, and heightmap intermediates — multi-GB, dev-machine only.
+# Final web-served artifacts live committed under web/public/.
+Assets/
+
+# Claude Code session data (handoffs, settings)
+.claude/
+
+# Playwright MCP session debris
+.playwright-mcp/

@@ -1,0 +1,16 @@
+{
+  "bin": "serhiivka.bin",
+  "png": "serhiivka.png",
+  "widthPx": 1025,
+  "heightPx": 1025,
+  "cellSizeM": 10.0,
+  "worldWidthM": 10240.0,
+  "worldHeightM": 10240.0,
+  "heightScale": 0.03125,
+  "minElevationM": -204.78125,
+  "sourceCellSizeM": 2.0,
+  "tileLayout": {
+    "cols": 40,
+    "rows": 40
+  }
+}

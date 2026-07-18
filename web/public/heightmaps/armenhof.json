@@ -1,0 +1,16 @@
+{
+  "bin": "armenhof.bin",
+  "png": "armenhof.png",
+  "widthPx": 385,
+  "heightPx": 385,
+  "cellSizeM": 10.0,
+  "worldWidthM": 3840.0,
+  "worldHeightM": 3840.0,
+  "heightScale": 0.03125,
+  "minElevationM": -204.78125,
+  "sourceCellSizeM": 2.0,
+  "tileLayout": {
+    "cols": 15,
+    "rows": 15
+  }
+}

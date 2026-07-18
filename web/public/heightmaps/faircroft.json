@@ -1,0 +1,16 @@
+{
+  "bin": "faircroft.bin",
+  "png": "faircroft.png",
+  "widthPx": 1281,
+  "heightPx": 1281,
+  "cellSizeM": 10.0,
+  "worldWidthM": 12800.0,
+  "worldHeightM": 12800.0,
+  "heightScale": 0.03125,
+  "minElevationM": -204.78125,
+  "sourceCellSizeM": 2.0,
+  "tileLayout": {
+    "cols": 50,
+    "rows": 50
+  }
+}

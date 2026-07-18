@@ -1,0 +1,16 @@
+{
+  "bin": "zargabad.bin",
+  "png": "zargabad.png",
+  "widthPx": 820,
+  "heightPx": 820,
+  "cellSizeM": 10.0,
+  "worldWidthM": 8192.0,
+  "worldHeightM": 8192.0,
+  "heightScale": 0.03125,
+  "minElevationM": -204.78125,
+  "sourceCellSizeM": 2.0,
+  "tileLayout": {
+    "cols": 32,
+    "rows": 32
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "bin": "zarichne.bin",
+  "png": "zarichne.png",
+  "widthPx": 461,
+  "heightPx": 461,
+  "cellSizeM": 10.0,
+  "worldWidthM": 4608.0,
+  "worldHeightM": 4608.0,
+  "heightScale": 0.03125,
+  "minElevationM": -204.78125,
+  "sourceCellSizeM": 2.0,
+  "tileLayout": {
+    "cols": 18,
+    "rows": 18
+  }
+}

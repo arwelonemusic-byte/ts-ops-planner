@@ -1,0 +1,16 @@
+{
+  "bin": "takistan.bin",
+  "png": "takistan.png",
+  "widthPx": 1025,
+  "heightPx": 1025,
+  "cellSizeM": 12.600000381469727,
+  "worldWidthM": 12902.400390625,
+  "worldHeightM": 12902.400390625,
+  "heightScale": 0.03125,
+  "minElevationM": -204.78125,
+  "sourceCellSizeM": 6.300000190734863,
+  "tileLayout": {
+    "cols": 16,
+    "rows": 16
+  }
+}

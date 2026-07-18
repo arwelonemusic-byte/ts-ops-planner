@@ -1,0 +1,6 @@
+# Local-only fixtures used by lib/replayFixtures.ts when DATABASE_URL is
+# empty (i.e. dev without prod secrets). Contains real session data
+# pulled from prod (player names, positions, etc.). Excluded from
+# deployment so they're not publicly downloadable from /dev-fixtures/<code>.json.
+# In prod, hasDatabase === true so this fallback path is never hit anyway.
+public/dev-fixtures/

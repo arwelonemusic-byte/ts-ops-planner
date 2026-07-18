@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 12800 12800" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+  <rect width="12800" height="12800" fill="#f1f5f9"/>
+  <g stroke="#cbd5e1" stroke-width="25" fill="none">
+    <line x1="1000" y1="0" x2="1000" y2="12800"/>
+    <line x1="0" y1="11800" x2="12800" y2="11800"/>
+    <line x1="2000" y1="0" x2="2000" y2="12800"/>
+    <line x1="0" y1="10800" x2="12800" y2="10800"/>
+    <line x1="3000" y1="0" x2="3000" y2="12800"/>
+    <line x1="0" y1="9800" x2="12800" y2="9800"/>
+    <line x1="4000" y1="0" x2="4000" y2="12800"/>
+    <line x1="0" y1="8800" x2="12800" y2="8800"/>
+    <line x1="6000" y1="0" x2="6000" y2="12800"/>
+    <line x1="0" y1="6800" x2="12800" y2="6800"/>
+    <line x1="7000" y1="0" x2="7000" y2="12800"/>
+    <line x1="0" y1="5800" x2="12800" y2="5800"/>
+    <line x1="8000" y1="0" x2="8000" y2="12800"/>
+    <line x1="0" y1="4800" x2="12800" y2="4800"/>
+    <line x1="9000" y1="0" x2="9000" y2="12800"/>
+    <line x1="0" y1="3800" x2="12800" y2="3800"/>
+    <line x1="11000" y1="0" x2="11000" y2="12800"/>
+    <line x1="0" y1="1800" x2="12800" y2="1800"/>
+    <line x1="12000" y1="0" x2="12000" y2="12800"/>
+    <line x1="0" y1="800" x2="12800" y2="800"/>
+  </g>
+  <g stroke="#475569" stroke-width="60" fill="none">
+    <line x1="5000" y1="0" x2="5000" y2="12800"/>
+    <line x1="0" y1="7800" x2="12800" y2="7800"/>
+    <line x1="10000" y1="0" x2="10000" y2="12800"/>
+    <line x1="0" y1="2800" x2="12800" y2="2800"/>
+  </g>
+  <text x="6400" y="550" text-anchor="middle" font-family="monospace" font-size="360" font-weight="bold" fill="#64748b">N (worldY = 12800)</text>
+  <text x="6400" y="12500" text-anchor="middle" font-family="monospace" font-size="360" font-weight="bold" fill="#64748b">S (worldY = 0)</text>
+  <text x="250" y="6500" font-family="monospace" font-size="360" font-weight="bold" fill="#64748b" transform="rotate(-90 250 6500)">W (worldX = 0)</text>
+  <text x="12550" y="6500" font-family="monospace" font-size="360" font-weight="bold" fill="#64748b" text-anchor="end" transform="rotate(-90 12550 6500)">E (worldX = 12800)</text>
+  <g fill="#0f172a" font-family="monospace" font-size="260" font-weight="bold">
+    <text x="750" y="11720">Y=1000</text>
+    <text x="750" y="10720">Y=2000</text>
+    <text x="750" y="9720">Y=3000</text>
+    <text x="750" y="8720">Y=4000</text>
+    <text x="750" y="7720">Y=5000</text>
+    <text x="750" y="6720">Y=6000</text>
+    <text x="750" y="5720">Y=7000</text>
+    <text x="750" y="4720">Y=8000</text>
+    <text x="750" y="3720">Y=9000</text>
+    <text x="750" y="2720">Y=10000</text>
+    <text x="750" y="1720">Y=11000</text>
+    <text x="750" y="720">Y=12000</text>
+  </g>
+  <g fill="#0f172a" font-family="monospace" font-size="260" font-weight="bold" text-anchor="start">
+    <text x="1100" y="12100">X=1000</text>
+    <text x="2100" y="12100">X=2000</text>
+    <text x="3100" y="12100">X=3000</text>
+    <text x="4100" y="12100">X=4000</text>
+    <text x="5100" y="12100">X=5000</text>
+    <text x="6100" y="12100">X=6000</text>
+    <text x="7100" y="12100">X=7000</text>
+    <text x="8100" y="12100">X=8000</text>
+    <text x="9100" y="12100">X=9000</text>
+    <text x="10100" y="12100">X=10000</text>
+    <text x="11100" y="12100">X=11000</text>
+    <text x="12100" y="12100">X=12000</text>
+  </g>
+  <text x="6400" y="6400" text-anchor="middle" dominant-baseline="middle" font-family="monospace" font-size="460" font-weight="bold" fill="#cbd5e1">EVERON (PLACEHOLDER)</text>
+</svg>

@@ -1,0 +1,16 @@
+{
+  "bin": "arland.bin",
+  "png": "arland.png",
+  "widthPx": 410,
+  "heightPx": 410,
+  "cellSizeM": 10.0,
+  "worldWidthM": 4096.0,
+  "worldHeightM": 4096.0,
+  "heightScale": 0.03125,
+  "minElevationM": -204.78125,
+  "sourceCellSizeM": 2.0,
+  "tileLayout": {
+    "cols": 16,
+    "rows": 16
+  }
+}

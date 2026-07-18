@@ -1,0 +1,16 @@
+{
+  "bin": "zimnitrita.bin",
+  "png": "zimnitrita.png",
+  "widthPx": 2049,
+  "heightPx": 2049,
+  "cellSizeM": 8.0,
+  "worldWidthM": 16384.0,
+  "worldHeightM": 16384.0,
+  "heightScale": 0.03125,
+  "minElevationM": -204.78125,
+  "sourceCellSizeM": 4.0,
+  "tileLayout": {
+    "cols": 32,
+    "rows": 32
+  }
+}
