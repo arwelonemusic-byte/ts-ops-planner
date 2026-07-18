@@ -171,6 +171,7 @@ const TERRAIN_FOLDER_TO_MAP_KEY: Record<string, string> = {
   al_hadra: "alhadra",
   seitenbuch: "seitenbuch",
   iraq: "iraq1990",
+  kunar: "kunar",
 };
 
 // worldFileName → maps.ts key. Higher-precision override for missions whose
