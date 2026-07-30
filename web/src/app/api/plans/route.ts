@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { generateCode, isValidCode } from "@/lib/code";
+import { generateCode } from "@/lib/code";
 
 const MAX_RETRIES = 5;
 
@@ -25,22 +25,11 @@ export async function POST(req: NextRequest) {
   // double-encoded jsonb *string* instead of the object (neon parsed it).
   const payload = sql.json(data as never);
 
-  if (typeof data.code === "string") {
-    if (!isValidCode(data.code)) {
-      return NextResponse.json(
-        { error: "Invalid code format" },
-        { status: 400 },
-      );
-    }
-    const code = data.code;
-    await sql`
-      INSERT INTO plans (code, data)
-      VALUES (${code}, ${payload}::jsonb)
-      ON CONFLICT (code) DO UPDATE
-        SET data = EXCLUDED.data, created_at = NOW()
-    `;
-    return NextResponse.json({ code });
-  }
+  // Server-mint only. Client-supplied codes (upsert semantics) were removed
+  // when this endpoint went unauthenticated: with them, any plan code that
+  // leaked (Discord screenshot, replay meta.planCode) was a WRITE capability
+  // — one curl could replace a commander's plan before /syncplan. A `code`
+  // field in the body is ignored; the response carries the minted code.
 
   for (let i = 0; i < MAX_RETRIES; i++) {
     const candidate = generateCode();

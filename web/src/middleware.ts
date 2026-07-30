@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Basic Auth gate. Protects the commander-facing surface (pages + POST to
-// /api/plans) behind a single shared secret configured via env vars. Reads
-// are left public — a plan's 6-char code is itself the capability token,
-// and the mod-side RestApi call therefore needs no credentials (and ships
-// no secret). Browser Basic Auth prompts the commander once; credentials
-// stay in the browser's credential cache afterwards.
-
-const PROTECTED_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+// Basic Auth gate — recorder endpoints only. The commander-facing surface
+// (pages, plan POST, all reads) is deliberately public: a plan's 6-char
+// code is the capability token for reading, and plan codes stopped being a
+// write capability when client-supplied codes were removed from POST
+// /api/plans (server-mint only — nothing to overwrite). The only writers
+// that remain privileged are the TS Replay recorder's POSTs, whose secret
+// lives in ts_replay.json on the game server — keeping auth there costs no
+// user any UX and stops strangers from creating/appending replay rows.
 
 function unauthorized(): NextResponse {
   return new NextResponse("Authentication required", {
@@ -26,19 +26,19 @@ function constantTimeEq(a: string, b: string): boolean {
 }
 
 export function middleware(req: NextRequest) {
+  // Reads on the replay endpoints stay public (recent list + by-code).
+  if (req.method === "GET") return NextResponse.next();
+
   const user = process.env.PLANNER_USER;
   const pass = process.env.PLANNER_PASS;
   if (!user || !pass) {
     // Dev convenience: running `next dev` locally without env vars shouldn't
-    // require auth. In production (Vercel), missing vars means the deploy
-    // was misconfigured — fail closed on writes/pages so we don't silently
-    // ship without auth. Reads stay public regardless.
+    // require auth. In production, missing vars means the deploy was
+    // misconfigured — fail closed on replay writes so we don't silently
+    // ship an open recorder endpoint.
     if (process.env.NODE_ENV !== "production") return NextResponse.next();
-    if (isPublicRead(req)) return NextResponse.next();
     return new NextResponse("Planner auth not configured", { status: 503 });
   }
-
-  if (isPublicRead(req)) return NextResponse.next();
 
   const header = req.headers.get("authorization");
   if (!header || !header.toLowerCase().startsWith("basic ")) {
@@ -60,25 +60,8 @@ export function middleware(req: NextRequest) {
   return NextResponse.next();
 }
 
-/** GETs against the share-by-code endpoints are the only public surface —
- *  the 6-char code is itself the capability token, so a viewer needs no
- *  credentials to load a plan or replay. Also includes the bare
- *  `/api/replays` listing endpoint (`?recent=N`) — replay codes aren't
- *  considered sensitive in this deployment, so the empty-state replay
- *  panel can populate a recent-list dropdown for one-tap loading.
- *  Everything else (pages, write APIs) requires Basic Auth. */
-function isPublicRead(req: NextRequest): boolean {
-  if (req.method !== "GET") return false;
-  const path = req.nextUrl.pathname;
-  return (
-    path.startsWith("/api/plans/") ||
-    path.startsWith("/api/replays/") ||
-    path === "/api/replays"
-  );
-}
-
 export const config = {
-  // Skip Next internals and common static assets. Anything else flows
-  // through the middleware — including page routes and /api/plans POST.
-  matcher: ["/((?!_next/|favicon\\.ico|.*\\.(?:png|jpg|jpeg|svg|gif|webp|ico|bin|json)$).*)"],
+  // Only the replay endpoints flow through the auth gate. Pages, plan
+  // routes, and static assets are fully public.
+  matcher: ["/api/replays", "/api/replays/:path*"],
 };

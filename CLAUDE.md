@@ -40,11 +40,11 @@ npm run lint       # eslint (Next.js config)
 
 Deploy: push to `master` on `github.com/arwelonemusic-byte/ts-ops-planner` (public repo — `Assets/` and `web/public/dev-fixtures/` stay untracked), then on the box run `/opt/ts-web/deploy-ops-planner.sh` (git pull → npm ci → build → restart). Env lives in `/etc/ts-ops-planner.env` (mode 600), never in the repo. The old Vercel flow (`npx vercel deploy --prod --archive=tgz`) is retired.
 
-Backend tests are curl round-trips — there is no test suite yet. POST is behind Basic Auth (`PLANNER_USER`/`PLANNER_PASS` from the env file); GET is public (the 6-char code is the capability token, so the mod ships no secret).
+Backend tests are curl round-trips — there is no test suite yet. The commander-facing surface (pages, plan POST, all reads) is **fully public** since 2026-07-19; only the replay-recorder POSTs remain behind Basic Auth (`PLANNER_USER`/`PLANNER_PASS` from the env file, used by `ts_replay.json` on the game server). Plan POST is **server-mint only** — a `code` field in the body is ignored (client-supplied upsert was removed because an unauthenticated upsert makes every leaked plan code a write capability).
 
 ```bash
-# POST mints a fresh code server-side; client-supplied codes are still supported for repeat-push iteration (upsert).
-curl -sS -u "$PLANNER_USER:$PLANNER_PASS" -X POST https://planner.tacticalshift.ru/api/plans \
+# POST mints a fresh code server-side (no auth needed; `code` in the body is ignored):
+curl -sS -X POST https://planner.tacticalshift.ru/api/plans \
   -H "Content-Type: application/json" \
   -d '{"schemaVersion":1,"markers":[{"kind":"custom","worldX":2000,"worldY":2000,"text":"Test"}]}'
 # GET needs no auth:
@@ -366,7 +366,7 @@ plans(   code TEXT PRIMARY KEY, data JSONB NOT NULL, created_at TIMESTAMPTZ DEFA
 replays( code TEXT PRIMARY KEY, world TEXT, meta JSONB, events JSONB, created_at TIMESTAMPTZ DEFAULT NOW())
 ```
 
-`plans.data` stores the full plan JSON as posted. `replays.events` is the unordered append-only event stream; `replays.meta` carries `startedAt`, `terrainResource`, `friendlyFactionKey` etc. (see `ReplayMeta` in `web/src/lib/replay.ts`). The recorder keeps appending to the same row throughout the session (`UPDATE replays SET events = events || $1`). Short codes are 6 chars from a curated alphabet (`src/lib/code.ts`). **Production flow: the server mints a fresh code per POST**; the client omits `code` from the body and reads the returned `{ code }` to show the commander. Client-specified codes are still accepted for test-iteration / repeat-push to a known code (upsert semantics).
+`plans.data` stores the full plan JSON as posted. `replays.events` is the unordered append-only event stream; `replays.meta` carries `startedAt`, `terrainResource`, `friendlyFactionKey` etc. (see `ReplayMeta` in `web/src/lib/replay.ts`). The recorder keeps appending to the same row throughout the session (`UPDATE replays SET events = events || $1`). Short codes are 6 chars from a curated alphabet (`src/lib/code.ts`). **The server mints a fresh code per POST** and the client reads the returned `{ code }` to show the commander. Client-specified codes are NOT accepted (removed 2026-07-19 along with page auth — with an unauthenticated endpoint, upsert-by-code would make every leaked plan code a write capability).
 
 The web tool POSTs plans with:
 ```json
