@@ -21,6 +21,12 @@ const EN: Dict = {
   "tool.options": "Options",
   "tool.rotate": "Rotate ({deg}°) — hold Shift for 1° steps",
 
+  "view.zoomIn": "Zoom in",
+  "view.zoomOut": "Zoom out",
+  "view.fit": "Fit whole map",
+  "view.3d": "3D view",
+  "view.2d": "2D view",
+
   "los.title": "Line of sight",
   "los.visible": "Clear",
   "los.blocked": "Blocked",
@@ -196,6 +202,12 @@ const RU: Dict = {
   "tool.ruler": "Линейка (E)",
   "tool.options": "Опции",
   "tool.rotate": "Поворот ({deg}°) — Shift — шаг 1°",
+
+  "view.zoomIn": "Приблизить",
+  "view.zoomOut": "Отдалить",
+  "view.fit": "Показать всю карту",
+  "view.3d": "3D-вид",
+  "view.2d": "2D-вид",
 
   "los.title": "Линия видимости",
   "los.visible": "Видимость есть",

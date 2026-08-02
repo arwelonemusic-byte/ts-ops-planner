@@ -11,7 +11,6 @@ import {
   Polygon,
   Polyline,
   TileLayer,
-  ZoomControl,
   useMap,
   useMapEvents,
 } from "react-leaflet";
@@ -19,6 +18,7 @@ import L, { CRS, DivIcon, Transformation } from "leaflet";
 import type { LatLngBoundsLiteral } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { markerDivIconHtml, militaryDivIconHtml } from "@/components/MarkerIcon";
+import MapViewControls from "@/components/MapViewControls";
 import type { IconEntry } from "@/lib/markerLibrary";
 import type { MapConfig } from "@/lib/maps";
 import { loadHeightmap, type HeightmapSampler } from "@/lib/heightmap";
@@ -238,6 +238,51 @@ function makeReplayIcon(c: ReplayCharRenderable): DivIcon {
 
 export type ClickPoint = { worldX: number; worldY: number };
 
+/** Imperative API published to the parent by both viewports (2D + 3D).
+ *  Powers the 2D↔3D view handoff: on toggle the page reads getView() from
+ *  the outgoing view and hands it to the incoming one. `x`/`z` are world
+ *  coords (z = worldY); `radius` is half the shorter viewport side in
+ *  world meters (a fit-square, zoom-level-agnostic). */
+export type MapApi = {
+  /** Null while the map is hidden (display:none) — a 0-size Leaflet map
+   *  reports a garbage viewport that would poison the 3D handoff. */
+  getView: () => { x: number; z: number; radius: number } | null;
+  fitWholeMap: () => void;
+};
+
+/** Publishes the MapApi and keeps a live map handle for the HUD buttons.
+ *  Renders nothing. */
+function ApiBridge({
+  mapRef,
+  onApiRef,
+  bounds,
+}: {
+  mapRef: React.MutableRefObject<L.Map | null>;
+  onApiRef: React.MutableRefObject<((api: MapApi) => void) | undefined>;
+  bounds: LatLngBoundsLiteral;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    mapRef.current = map;
+    onApiRef.current?.({
+      getView: () => {
+        const size = map.getSize();
+        if (!size.x || !size.y) return null;
+        const c = map.getCenter();
+        const b = map.getBounds();
+        const radius =
+          Math.min(b.getEast() - b.getWest(), b.getNorth() - b.getSouth()) / 2;
+        return { x: c.lng, z: c.lat, radius };
+      },
+      fitWholeMap: () => map.fitBounds(bounds, { padding: [20, 20] }),
+    });
+    return () => {
+      if (mapRef.current === map) mapRef.current = null;
+    };
+  }, [map, mapRef, onApiRef, bounds]);
+  return null;
+}
+
 function ClickCapture({
   onClick,
   onDoubleClick,
@@ -298,6 +343,11 @@ function MapFocusEffect({
   useEffect(() => {
     if (!focus) return;
     if (lastKeyRef.current === focus.key) return;
+    // Hidden (display:none) map — the 3D viewport is handling this focus.
+    // Don't consume the key and don't flyTo: a 0-size map lands on a
+    // garbage view that survives until the user toggles back.
+    const size = map.getSize();
+    if (!size.x || !size.y) return;
     lastKeyRef.current = focus.key;
     // CRS.Simple: lat = worldY, lng = worldX.
     map.flyTo([focus.worldY, focus.worldX], focus.zoom, { duration: 0.6 });
@@ -394,7 +444,19 @@ function ReplayShotLayer({ shots }: { shots: ReplayShotRenderable[] }) {
 function FitWorld({ bounds }: { bounds: LatLngBoundsLiteral }) {
   const map = useMap();
   useEffect(() => {
+    // While hidden (display:none — the page keeps the 2D map mounted under
+    // the 3D view) the map's size is 0 and getBoundsZoom returns a garbage
+    // max-zoom view that would poison both the visible state on return and
+    // the 3D handoff. Skip and remember; the ResizeObserver below completes
+    // the fit on first reveal.
+    let pendingFit = false;
     const fit = () => {
+      const size = map.getSize();
+      if (!size.x || !size.y) {
+        pendingFit = true;
+        return;
+      }
+      pendingFit = false;
       map.invalidateSize();
       // Clamp min zoom to the fit zoom — users can't zoom further out than the
       // whole-map view, otherwise the map becomes a tiny island on a black void.
@@ -406,10 +468,15 @@ function FitWorld({ bounds }: { bounds: LatLngBoundsLiteral }) {
     // signal to rehome the view.
     fit();
     window.addEventListener("resize", fit);
-    // Container resize (e.g. mobile tool sheet opening/closing) — just
-    // re-project tiles; don't refit, so the user's current zoom/pan sticks.
+    // Container resize (e.g. mobile tool sheet opening/closing, or the map
+    // being re-shown after a hidden spell) — just re-project tiles; don't
+    // refit, so the user's current zoom/pan sticks. Exception: a fit that
+    // was skipped while hidden (map switched in 3D mode) runs now.
     const container = map.getContainer();
-    const ro = new ResizeObserver(() => map.invalidateSize());
+    const ro = new ResizeObserver(() => {
+      map.invalidateSize();
+      if (pendingFit) fit();
+    });
     ro.observe(container);
     return () => {
       window.removeEventListener("resize", fit);
@@ -899,6 +966,9 @@ export default function MapClient({
   onDeleteMarker,
   onRotateMarker,
   onHeightmapChange,
+  onApi,
+  view3D = false,
+  onToggleView,
 }: {
   mapConfig: MapConfig;
   /** Global web-only marker-label text color. "black" reads on light terrain;
@@ -971,9 +1041,27 @@ export default function MapClient({
   onRotateMarker?: (deg: number) => void;
   /** Fires whenever the heightmap sampler for the current map is (re)loaded or cleared. */
   onHeightmapChange?: (sampler: HeightmapSampler | null) => void;
+  /** Publishes the imperative MapApi (getView / fitWholeMap) to the parent.
+   *  Used for the 2D↔3D viewport handoff. */
+  onApi?: (api: MapApi) => void;
+  /** Current page-level view state, reflected in the HUD's 3D toggle. */
+  view3D?: boolean;
+  /** When provided, the top-right HUD cluster (zoom ± / fit / 3D) renders
+   *  and its 3D button calls this. Absent → no HUD (and no way into 3D). */
+  onToggleView?: () => void;
 }) {
   const selectedMarker = markers.find((m) => m.selected) ?? null;
   const [zoom, setZoom] = useState<number>(-4);
+  // Live Leaflet map handle for the HUD buttons (outside the MapContainer
+  // tree, so useMap() isn't available there). Set by ApiBridge.
+  const mapInstRef = useRef<L.Map | null>(null);
+  // Ref-wrapped so an inline onApi prop doesn't re-run ApiBridge's effect
+  // every render. (ApiBridge publishes on mount from the initial value;
+  // this effect keeps the ref fresh for any later re-publish.)
+  const onApiRef = useRef(onApi);
+  useEffect(() => {
+    onApiRef.current = onApi;
+  }, [onApi]);
   const worldBounds = useMemo(() => boundsFor(mapConfig), [mapConfig]);
   // For tiled maps, shift the world into the positive pixel quadrant via a custom
   // CRS transformation. Default CRS.Simple maps our (lat=worldY) → pixel_y = -lat,
@@ -1013,6 +1101,7 @@ export default function MapClient({
   const centerLat = (mapConfig.worldBL[1] + mapConfig.worldUR[1]) / 2;
   const centerLng = (mapConfig.worldBL[0] + mapConfig.worldUR[0]) / 2;
   return (
+    <div className="relative h-full w-full">
     <MapContainer
       key={mapConfig.key}
       crs={tiledCrs}
@@ -1029,7 +1118,7 @@ export default function MapClient({
       style={{ width: "100%", height: "100%", background: "#0f172a" }}
     >
       <CrosshairClass mode={cursorMode} />
-      <ZoomControl position="topright" />
+      <ApiBridge mapRef={mapInstRef} onApiRef={onApiRef} bounds={worldBounds} />
       <MapFocusEffect focus={mapFocus} />
       {mapConfig.tilePattern && mapConfig.tileMaxZoom !== undefined ? (
         // Pyramid layout: pyramid-z=0 is the whole map in one 256px tile and
@@ -1374,5 +1463,21 @@ export default function MapClient({
         />
       )}
     </MapContainer>
+
+    {/* Top-right HUD (zoom ± / fit / 3D). A sibling of MapContainer, not a
+        child — Leaflet would swallow its pointer events otherwise. Replaces
+        the old Leaflet ZoomControl. */}
+    {onToggleView && (
+      <MapViewControls
+        onZoomIn={() => mapInstRef.current?.zoomIn()}
+        onZoomOut={() => mapInstRef.current?.zoomOut()}
+        onFit={() =>
+          mapInstRef.current?.fitBounds(worldBounds, { padding: [20, 20] })
+        }
+        view3D={view3D}
+        onToggleView={onToggleView}
+      />
+    )}
+    </div>
   );
 }

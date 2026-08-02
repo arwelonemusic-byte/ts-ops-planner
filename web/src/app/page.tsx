@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ClickPoint,
+  MapApi,
   RenderableMarker,
   RenderableLine,
   RenderablePolygon,
@@ -319,10 +320,44 @@ export default function Page() {
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
-  // 3D viewport prototype toggle. Desktop-only — the toggle button is hidden
-  // on mobile, so mobile sessions can never flip this true. Plan markers /
-  // lines / overlays are not yet drawn in the 3D view; this is terrain only.
-  const [view3D, setView3D] = useState(false);
+  // 3D viewport toggle — available in BOTH plan and replay modes via the
+  // top-right HUD cluster (MapViewControls). Desktop-only: the toggle button
+  // is hidden on mobile and a matchMedia guard force-drops to 2D. Plan
+  // markers / lines / overlays are not yet drawn in the 3D view.
+  //
+  // Swap strategy (ported from ts-mission-builder): the 2D Leaflet map stays
+  // MOUNTED inside a `hidden` wrapper while 3D is up, so its pan/zoom
+  // survives the round-trip; the 3D view mounts on demand and receives the
+  // 2D viewport via getView() → initialView. Per-view MapApi refs — a
+  // single ref would go stale across toggles. `view3DRef` mirrors the state
+  // for non-React event paths.
+  const [view3D, setView3DState] = useState(false);
+  const view3DRef = useRef(false);
+  const enterViewRef = useRef<{ x: number; z: number; radius: number } | null>(null);
+  const mapApi2d = useRef<MapApi | null>(null);
+  const mapApi3d = useRef<MapApi | null>(null);
+  const setView3D = (v: boolean) => {
+    if (v === view3DRef.current) return;
+    if (v) enterViewRef.current = mapApi2d.current?.getView() ?? null;
+    else mapApi3d.current = null;
+    view3DRef.current = v;
+    setView3DState(v);
+  };
+  // Mobile is 2D-only: no touch camera controls and the HUD is hidden. If
+  // the viewport shrinks under the md breakpoint while 3D is up, drop back.
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const apply = () => {
+      if (mq.matches && view3DRef.current) {
+        mapApi3d.current = null;
+        view3DRef.current = false;
+        setView3DState(false);
+      }
+    };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
 
   // Tool & line drafting state.
   const [tool, setTool] = useState<Tool>("marker");
@@ -1271,6 +1306,10 @@ export default function Page() {
 
   function setRulerModeAndReset(next: "line" | "radial") {
     if (next === rulerMode) return;
+    // Radial LOS renders its visibility mask as a Leaflet ImageOverlay,
+    // which the 3D viewport can't drape (v1) — arming it drops back to 2D
+    // (same auto-switch pattern as ts-mission-builder's sector draw).
+    if (next === "radial") setView3D(false);
     setRulerMode(next);
     setRulerStart(null);
     setRulerEnd(null);
@@ -2290,11 +2329,8 @@ export default function Page() {
                   ReplayMeta.planCode); today it's empty and the user
                   pastes a code to load a plan as overlay. Markers/lines
                   render via the existing `mode === "plan" || showPlan`
-                  gate around `renderable*`.
-                  Hidden in 3D — the 3D viewport intentionally suppresses
-                  plan markers/lines/polygons to avoid the 2D-vs-3D
-                  rotation / billboard weirdness. */}
-              {!view3D && (
+                  gate around `renderable*` — in BOTH viewports since the
+                  3D view learned to render plan content. */}
               <>
               <div className="h-[32px] flex items-center gap-4">
                 <div className="flex items-center gap-2 shrink-0">
@@ -2358,7 +2394,6 @@ export default function Page() {
                 </p>
               )}
               </>
-              )}
             </div>
           </div>
         </>
@@ -2429,15 +2464,10 @@ export default function Page() {
           transition: `bottom ${SHEET_MS}ms ${SHEET_EASE}`,
         }}
       >
-        {view3D && mode === "replay" ? (
-          <MapClient3D
-            mapConfig={effectiveMapConfig}
-            replayChars={replayChars}
-            replayShots={replayShots}
-            replayVehicles={replayVehicles}
-            mapFocus={mapFocus}
-          />
-        ) : (
+        {/* 2D stays mounted (CSS-hidden) while 3D is up so its pan/zoom
+            survives the round-trip; 3D mounts on demand with the 2D
+            viewport handed over via initialView. */}
+        <div className={`absolute inset-0 ${view3D ? "hidden" : ""}`}>
         <MapClient
           mapConfig={effectiveMapConfig}
           labelColor={labelColor}
@@ -2478,7 +2508,53 @@ export default function Page() {
           onDeleteMarker={deleteSelected}
           onRotateMarker={setRotation}
           onHeightmapChange={setLosSampler}
+          onApi={(api) => (mapApi2d.current = api)}
+          view3D={view3D}
+          onToggleView={() => setView3D(!view3D)}
         />
+        </div>
+        {view3D && (
+          <MapClient3D
+            mapConfig={effectiveMapConfig}
+            labelColor={labelColor}
+            markers={mode === "plan" || showPlan ? renderable : []}
+            lines={mode === "plan" || showPlan ? renderableLines : []}
+            polygons={mode === "plan" || showPlan ? renderablePolygons : []}
+            draft={mode === "replay" ? null : draftRender}
+            ruler={rulerRender}
+            rulerMode={rulerMode}
+            planOpacity={mode === "replay" && showPlan ? planOpacity : 1}
+            cursorMode={
+              mode === "replay"
+                ? tool === "ruler"
+                  ? "aggressive"
+                  : "off"
+                : tool === "line" || tool === "ruler"
+                  ? "aggressive"
+                  : tool === "marker"
+                    ? "container"
+                    : "off"
+            }
+            linesInteractive={mode !== "replay" && tool !== "line" && tool !== "ruler"}
+            markersInteractive={mode !== "replay" && tool === "marker"}
+            onMapClick={handleMapClick}
+            onMapDoubleClick={handleMapDoubleClick}
+            onMapMouseMove={handleMapMouseMove}
+            onMapContextMenu={handleMapContextMenu}
+            onMarkerClick={handleMarkerClick}
+            onMarkerDrag={handleMarkerDrag}
+            onLineClick={handleLineClick}
+            onDuplicateMarker={duplicateSelected}
+            onDeleteMarker={deleteSelected}
+            replayChars={replayChars}
+            replayShots={replayShots}
+            replayVehicles={replayVehicles}
+            mapFocus={mapFocus}
+            initialView={enterViewRef.current}
+            onApi={(api) => (mapApi3d.current = api)}
+            view3D
+            onToggleView={() => setView3D(false)}
+          />
         )}
 
       </div>
@@ -2547,30 +2623,8 @@ export default function Page() {
                 {saving ? t("push.pending") : t("push.button")}
               </button>
             )}
-            {/* 2D / 3D viewport toggle — replay-mode only. Same segmented
-                style as ModeToggle so the two sit visually consistent.
-                Mobile hides it (mobile is 2D-only). */}
-            {mode === "replay" && (
-              <div className="hidden md:flex h-[40px] rounded-[8px] bg-[#2e3439] p-1 items-center gap-1 shadow-[0px_16px_32px_0px_rgba(0,0,0,0.4)] shrink-0">
-                {([false, true] as const).map((v) => {
-                  const active = view3D === v;
-                  return (
-                    <button
-                      key={v ? "3d" : "2d"}
-                      type="button"
-                      onClick={() => setView3D(v)}
-                      className={`h-full px-3 rounded-[6px] text-[12px] leading-[20px] font-medium flex items-center transition-colors ${
-                        active
-                          ? "bg-[#f4db50] text-[#202427]"
-                          : "text-white/60 hover:text-white"
-                      }`}
-                    >
-                      <span>{v ? "3D" : "2D"}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            {/* The 2D/3D viewport toggle moved to the top-right HUD cluster
+                (MapViewControls — mirrors TS Mission Builder). */}
             <div className="relative">
               <ToolSquare
                 active={menuOpen}
