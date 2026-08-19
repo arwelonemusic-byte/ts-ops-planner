@@ -204,6 +204,28 @@ export const MAPS: MapConfig[] = [
     tilePattern: "/tiles/kunar/{z}/{x}/{y}.jpg",
     tileMaxZoom: 4,
   },
+  {
+    key: "merak",
+    label: "Merak",
+    imagePath: "/merak_final.jpg",
+    worldBL: [0, 0],
+    worldUR: [10240, 10240],
+    heightmapBin: "/heightmaps/merak.bin",
+    heightmapMeta: "/heightmaps/merak.json",
+    tilePattern: "/tiles/merak/{z}/{x}/{y}.jpg",
+    tileMaxZoom: 6,
+  },
+  {
+    key: "mogadishu",
+    label: "Mogadishu",
+    imagePath: "/mogadishu_final.jpg",
+    worldBL: [0, 0],
+    worldUR: [6000, 6000],
+    heightmapBin: "/heightmaps/mogadishu.bin",
+    heightmapMeta: "/heightmaps/mogadishu.json",
+    tilePattern: "/tiles/mogadishu/{z}/{x}/{y}.jpg",
+    tileMaxZoom: 5,
+  },
 ];
 
 export const DEFAULT_MAP = MAPS[0];
