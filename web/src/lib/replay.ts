@@ -172,6 +172,8 @@ const TERRAIN_FOLDER_TO_MAP_KEY: Record<string, string> = {
   seitenbuch: "seitenbuch",
   iraq: "iraq1990",
   kunar: "kunar",
+  merakisland: "merak", // Merak Island ships under terrain folder "MerakIsland"
+  mogadishu: "mogadishu",
 };
 
 // worldFileName → maps.ts key. Higher-precision override for missions whose
