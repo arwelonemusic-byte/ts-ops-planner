@@ -1,0 +1,16 @@
+{
+  "bin": "novka.bin",
+  "png": "novka.png",
+  "widthPx": 282,
+  "heightPx": 282,
+  "cellSizeM": 10.0,
+  "worldWidthM": 2816.0,
+  "worldHeightM": 2816.0,
+  "heightScale": 0.03125,
+  "minElevationM": -204.78125,
+  "sourceCellSizeM": 2.0,
+  "tileLayout": {
+    "cols": 11,
+    "rows": 11
+  }
+}

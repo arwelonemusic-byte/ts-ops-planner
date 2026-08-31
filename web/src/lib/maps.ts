@@ -226,6 +226,17 @@ export const MAPS: MapConfig[] = [
     tilePattern: "/tiles/mogadishu/{z}/{x}/{y}.jpg",
     tileMaxZoom: 5,
   },
+  {
+    key: "novka",
+    label: "Novka",
+    imagePath: "/novka_final.jpg",
+    worldBL: [0, 0],
+    worldUR: [2816, 2816],
+    heightmapBin: "/heightmaps/novka.bin",
+    heightmapMeta: "/heightmaps/novka.json",
+    tilePattern: "/tiles/novka/{z}/{x}/{y}.jpg",
+    tileMaxZoom: 4,
+  },
 ];
 
 export const DEFAULT_MAP = MAPS[0];
