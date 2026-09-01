@@ -237,6 +237,17 @@ export const MAPS: MapConfig[] = [
     tilePattern: "/tiles/novka/{z}/{x}/{y}.jpg",
     tileMaxZoom: 4,
   },
+  {
+    key: "westzagoria",
+    label: "West Zagoria",
+    imagePath: "/westzagoria_final.jpg",
+    worldBL: [0, 0],
+    worldUR: [4608, 4608],
+    heightmapBin: "/heightmaps/westzagoria.bin",
+    heightmapMeta: "/heightmaps/westzagoria.json",
+    tilePattern: "/tiles/westzagoria/{z}/{x}/{y}.jpg",
+    tileMaxZoom: 5,
+  },
 ];
 
 export const DEFAULT_MAP = MAPS[0];
