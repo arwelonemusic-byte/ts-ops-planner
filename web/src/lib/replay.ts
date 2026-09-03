@@ -174,6 +174,8 @@ const TERRAIN_FOLDER_TO_MAP_KEY: Record<string, string> = {
   kunar: "kunar",
   merakisland: "merak", // Merak Island ships under terrain folder "MerakIsland"
   mogadishu: "mogadishu",
+  // Ships without the `worlds/` prefix; folder name contains a space.
+  "west zagoria": "westzagoria",
 };
 
 // worldFileName → maps.ts key. Higher-precision override for missions whose
@@ -199,7 +201,14 @@ export function parseTerrainFolder(terrainResource: string): string | null {
   if (!terrainResource) return null;
   const stripped = terrainResource.replace(/^\{[0-9A-Fa-f]+\}/, "");
   const m = stripped.match(/^worlds?\/([^/]+)\//i);
-  return m ? m[1] : null;
+  if (m) return m[1];
+  // Some mod worlds omit the `worlds/` prefix entirely and ship the terrain
+  // at the archive root, e.g. "West Zagoria/.Data/West Zagoria_0_supertexture.edds".
+  // Fall back to the first path segment. Safe: without this these paths returned
+  // null (manual map selection), and the segment still has to hit the lookup
+  // table below to resolve to anything.
+  const first = stripped.match(/^([^/]+)\/(?!$)/);
+  return first ? first[1] : null;
 }
 
 /** Resolve a replay's auto-detected map key, or null if the mod-side
