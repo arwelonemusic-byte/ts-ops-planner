@@ -159,6 +159,7 @@ const TERRAIN_FOLDER_TO_MAP_KEY: Record<string, string> = {
   chernot: "chernarus",
   zarichne: "zarichne",
   zargabad: "zargabad",
+  zargabadempty: "zargabad", // "ZargabadEmpty" variant world reuses the Zargabad map
   zimnitrita: "zimnitrita",
   serhiivka: "serhiivka",
   takistan: "takistan",
