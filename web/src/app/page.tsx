@@ -111,6 +111,8 @@ const STORAGE_KEY_MAP = "ts-ops-planner-map-v1";
 const STORAGE_KEY_IMPORTED = "ts-ops-planner-imported-v1";
 const STORAGE_KEY_POLYGONS = "ts-ops-planner-polygons-v1";
 const STORAGE_KEY_LABEL_COLOR = "ts-ops-planner-label-color-v1";
+/** SAT basemap preference (not part of the plan — a display choice). */
+const STORAGE_KEY_SAT = "ts-ops-planner-sat-v1";
 
 /** Global text color for marker labels. Web-only — does not get pushed to the
  *  mod. Lets the user flip to white when the basemap is dark enough that black
@@ -333,6 +335,20 @@ export default function Page() {
   // for non-React event paths.
   const [view3D, setView3DState] = useState(false);
   const view3DRef = useRef(false);
+  // Satellite basemap toggle (SAT HUD button, maps with a `sat` pyramid only).
+  const [satLayer, setSatLayer] = useState(false);
+  useEffect(() => {
+    try {
+      setSatLayer(localStorage.getItem(STORAGE_KEY_SAT) === "1");
+    } catch {}
+  }, []);
+  const toggleSat = () =>
+    setSatLayer((v) => {
+      try {
+        localStorage.setItem(STORAGE_KEY_SAT, v ? "0" : "1");
+      } catch {}
+      return !v;
+    });
   const enterViewRef = useRef<{ x: number; z: number; radius: number } | null>(null);
   const mapApi2d = useRef<MapApi | null>(null);
   const mapApi3d = useRef<MapApi | null>(null);
@@ -2511,6 +2527,8 @@ export default function Page() {
           onApi={(api) => (mapApi2d.current = api)}
           view3D={view3D}
           onToggleView={() => setView3D(!view3D)}
+          satLayer={satLayer}
+          onToggleSat={toggleSat}
         />
         </div>
         {view3D && (
@@ -2554,6 +2572,8 @@ export default function Page() {
             onApi={(api) => (mapApi3d.current = api)}
             view3D
             onToggleView={() => setView3D(false)}
+            satLayer={satLayer}
+            onToggleSat={toggleSat}
           />
         )}
 

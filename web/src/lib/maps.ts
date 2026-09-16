@@ -14,6 +14,19 @@ export type MapConfig = {
   tilePattern?: string;
   /** Max zoom level available in the tile pyramid (inclusive, 0 = whole map in 1 tile). */
   tileMaxZoom?: number;
+  /** Optional satellite-style pyramid (nadir World Editor captures stitched by
+   *  tools/map-gen/nadir_mosaic.py, then tile_pyramid.py; shared with
+   *  ts-mission-builder). The topo pyramid is 1 px = 1 m at its deepest level;
+   *  this one holds 2^nativeZoom px per metre there, so the map serves it up to
+   *  Leaflet zoom `nativeZoom` before upscaling. Toggled by the SAT HUD button. */
+  sat?: SatTiles;
+};
+
+export type SatTiles = {
+  tilePattern: string;
+  tileMaxZoom: number;
+  /** log2 of the pixels-per-metre at tileMaxZoom (2 = 4 px/m) */
+  nativeZoom: number;
 };
 
 export const MAPS: MapConfig[] = [
@@ -49,6 +62,8 @@ export const MAPS: MapConfig[] = [
     heightmapMeta: "/heightmaps/kolguyev.json",
     tilePattern: "/tiles/kolguyev/{z}/{x}/{y}.jpg",
     tileMaxZoom: 6,
+    // 2026-09-16: 4096 nadir frames (step 200 / 950 m), ortho-stitched, 4 px/m -> 52000 px.
+    sat: { tilePattern: "/tiles/kolguyev-sat/{z}/{x}/{y}.jpg", tileMaxZoom: 8, nativeZoom: 2 },
   },
   {
     key: "zarichne",
@@ -236,6 +251,8 @@ export const MAPS: MapConfig[] = [
     heightmapMeta: "/heightmaps/novka.json",
     tilePattern: "/tiles/novka/{z}/{x}/{y}.jpg",
     tileMaxZoom: 4,
+    // 2026-09-16: 841 nadir frames (step 100 / 1200 m), ortho-stitched, 4 px/m -> 11264 px.
+    sat: { tilePattern: "/tiles/novka-sat/{z}/{x}/{y}.jpg", tileMaxZoom: 6, nativeZoom: 2 },
   },
   {
     key: "westzagoria",

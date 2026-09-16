@@ -130,6 +130,9 @@ type Props = {
   onApi?: (api: MapApi) => void;
   view3D: boolean;
   onToggleView: () => void;
+  /** Satellite basemap as the terrain texture (maps with MapConfig.sat only). */
+  satLayer?: boolean;
+  onToggleSat?: () => void;
 };
 
 const POLAR_MIN = (1 * Math.PI) / 180;
@@ -833,10 +836,16 @@ export default function MapClient3D({
   onApi,
   view3D,
   onToggleView,
+  satLayer = false,
+  onToggleSat,
 }: Props) {
   const mountRef = useRef<HTMLDivElement>(null);
   const worldRef = useRef<World | null>(null);
   const coordsRef = useRef<HTMLSpanElement>(null);
+  // Basemap choice read by the setup closure's initial texture load; the
+  // swap effect below handles toggles while the view is up.
+  const satLayerRef = useRef(satLayer);
+  satLayerRef.current = satLayer;
   // The 2D handoff applies to the FIRST setup only — a map switch while
   // in 3D re-runs setup with coords that belong to the previous world.
   const initialViewRef = useRef(initialView ?? null);
@@ -1134,7 +1143,7 @@ export default function MapClient3D({
       terrainMat.needsUpdate = true;
       world.render();
     };
-    const composite = compositeTerrainTexture(mapConfig);
+    const composite = compositeTerrainTexture(mapConfig, satLayerRef.current);
     if (composite) {
       composite
         .then((canvas) => {
@@ -1923,6 +1932,36 @@ export default function MapClient3D({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapConfig]);
 
+  // ===== Basemap swap (SAT toggle) =========================================
+  // Setup loaded the texture for the basemap active at mount; a toggle
+  // while 3D is up swaps the terrain material's map in place (the
+  // composite cache makes flipping back instant).
+  useEffect(() => {
+    const world = worldRef.current;
+    const mesh = world?.terrain;
+    if (!world || !mesh) return;
+    const composite = compositeTerrainTexture(mapConfig, satLayer);
+    if (!composite) return;
+    let stale = false;
+    composite
+      .then((canvas) => {
+        if (stale) return;
+        const mat = mesh.material as THREE.MeshBasicMaterial;
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.anisotropy = mat.map?.anisotropy ?? 1;
+        mat.map?.dispose();
+        mat.map = texture;
+        mat.needsUpdate = true;
+        world.render();
+      })
+      .catch(() => {});
+    return () => {
+      stale = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [satLayer]);
+
   // ===== Plan-overlay sync ===============================================
   // Clear-and-rebuild on any plan-content change — same dep list shape as
   // the 2D viewport's declarative re-render.
@@ -2309,6 +2348,9 @@ export default function MapClient3D({
         }}
         view3D={view3D}
         onToggleView={onToggleView}
+        satAvailable={!!mapConfig.sat}
+        satLayer={satLayer}
+        onToggleSat={onToggleSat}
       />
 
       {/* coordinate + elevation readout (no scale bar — perspective has no

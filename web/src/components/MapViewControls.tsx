@@ -11,12 +11,26 @@ type Props = {
   onFit: () => void;
   view3D: boolean;
   onToggleView: () => void;
+  /** Satellite basemap toggle — the button renders only when the map ships a
+   *  satellite pyramid (MapConfig.sat). */
+  satAvailable?: boolean;
+  satLayer?: boolean;
+  onToggleSat?: () => void;
 };
 
 const BTN =
   "w-9 h-9 bg-[#202427] hover:bg-[#2e3439] active:bg-[#3a4249] flex items-center justify-center";
 
-export default function MapViewControls({ onZoomIn, onZoomOut, onFit, view3D, onToggleView }: Props) {
+export default function MapViewControls({
+  onZoomIn,
+  onZoomOut,
+  onFit,
+  view3D,
+  onToggleView,
+  satAvailable,
+  satLayer,
+  onToggleSat,
+}: Props) {
   const { t } = useT();
   return (
     <div className="max-md:hidden absolute top-4 right-4 z-[1000] flex flex-col gap-px rounded-[8px] overflow-hidden shadow-[0px_16px_32px_0px_rgba(0,0,0,0.4)]">
@@ -49,6 +63,17 @@ export default function MapViewControls({ onZoomIn, onZoomOut, onFit, view3D, on
           <path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
         </svg>
       </button>
+      {satAvailable && onToggleSat && (
+        <button
+          type="button"
+          aria-label={t(satLayer ? "view.topo" : "view.sat")}
+          title={t(satLayer ? "view.topo" : "view.sat")}
+          onClick={onToggleSat}
+          className={`${BTN} text-[10px] font-semibold tracking-wide ${satLayer ? "text-[#f4db50]" : "text-white/70"}`}
+        >
+          SAT
+        </button>
+      )}
       <button
         type="button"
         aria-label={t(view3D ? "view.2d" : "view.3d")}

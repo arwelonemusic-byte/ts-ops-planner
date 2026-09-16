@@ -969,6 +969,8 @@ export default function MapClient({
   onApi,
   view3D = false,
   onToggleView,
+  satLayer = false,
+  onToggleSat,
 }: {
   mapConfig: MapConfig;
   /** Global web-only marker-label text color. "black" reads on light terrain;
@@ -1049,6 +1051,9 @@ export default function MapClient({
   /** When provided, the top-right HUD cluster (zoom ± / fit / 3D) renders
    *  and its 3D button calls this. Absent → no HUD (and no way into 3D). */
   onToggleView?: () => void;
+  /** Satellite basemap on top of the topo tiles (maps with MapConfig.sat only). */
+  satLayer?: boolean;
+  onToggleSat?: () => void;
 }) {
   const selectedMarker = markers.find((m) => m.selected) ?? null;
   const [zoom, setZoom] = useState<number>(-4);
@@ -1144,6 +1149,24 @@ export default function MapClient({
         />
       ) : (
         <ImageOverlay url={mapConfig.imagePath} bounds={worldBounds} />
+      )}
+      {satLayer && mapConfig.sat && (
+        // Satellite pyramid above the topo layer. Its deepest level holds
+        // 2^nativeZoom px per metre, so the native Leaflet zoom range ends at
+        // `nativeZoom` instead of 0 and the URL-z offset shrinks accordingly.
+        <TileLayer
+          key={`sat-${mapConfig.key}`}
+          url={mapConfig.sat.tilePattern}
+          tileSize={256}
+          minZoom={-(mapConfig.sat.tileMaxZoom - mapConfig.sat.nativeZoom)}
+          maxZoom={4}
+          minNativeZoom={-(mapConfig.sat.tileMaxZoom - mapConfig.sat.nativeZoom)}
+          maxNativeZoom={mapConfig.sat.nativeZoom}
+          zoomOffset={mapConfig.sat.tileMaxZoom - mapConfig.sat.nativeZoom}
+          zIndex={2}
+          noWrap
+          bounds={L.latLngBounds(worldBounds)}
+        />
       )}
 
       {/* Imported polygon zones. Fill-outside uses a ring polygon (worldBounds
@@ -1476,6 +1499,9 @@ export default function MapClient({
         }
         view3D={view3D}
         onToggleView={onToggleView}
+        satAvailable={!!mapConfig.sat}
+        satLayer={satLayer}
+        onToggleSat={onToggleSat}
       />
     )}
     </div>

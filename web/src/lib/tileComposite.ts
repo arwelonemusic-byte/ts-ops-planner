@@ -4,7 +4,9 @@
 // source decodes to ~1 GB RGBA); the composite picks the deepest zoom
 // level whose stitched size stays within MAX_TEXTURE_PX and draws every
 // available tile. Tiles beyond the world's data extent don't exist (404)
-// — the pre-filled background color shows there instead.
+// — the pre-filled background color shows there instead. `sat` picks the
+// map's satellite pyramid (when it ships one) instead of the topo pyramid;
+// both are cached separately.
 import type { MapConfig } from "./maps";
 
 const MAX_TEXTURE_PX = 6144;
@@ -17,26 +19,38 @@ const CACHE_CAP = 3;
 const cache = new Map<string, Promise<HTMLCanvasElement>>();
 
 /** Null when the map has no tile pyramid — caller falls back to imagePath. */
-export function compositeTerrainTexture(cfg: MapConfig): Promise<HTMLCanvasElement> | null {
+export function compositeTerrainTexture(cfg: MapConfig, sat = false): Promise<HTMLCanvasElement> | null {
   if (!cfg.tilePattern || cfg.tileMaxZoom === undefined) return null;
-  const hit = cache.get(cfg.key);
+  const useSat = sat && !!cfg.sat;
+  const key = `${cfg.key}:${useSat ? "sat" : "topo"}`;
+  const hit = cache.get(key);
   if (hit) return hit;
-  const p = build(cfg, cfg.tilePattern, cfg.tileMaxZoom);
-  cache.set(cfg.key, p);
-  for (const key of cache.keys()) {
+  const p =
+    useSat && cfg.sat
+      ? build(cfg, cfg.sat.tilePattern, cfg.sat.tileMaxZoom, 2 ** cfg.sat.nativeZoom)
+      : build(cfg, cfg.tilePattern, cfg.tileMaxZoom, 1);
+  cache.set(key, p);
+  for (const k of cache.keys()) {
     if (cache.size <= CACHE_CAP) break;
-    if (key !== cfg.key) cache.delete(key);
+    if (k !== key) cache.delete(k);
   }
   return p;
 }
 
-async function build(cfg: MapConfig, tilePattern: string, tileMaxZoom: number): Promise<HTMLCanvasElement> {
+async function build(
+  cfg: MapConfig,
+  tilePattern: string,
+  tileMaxZoom: number,
+  /** px per metre at the pyramid's deepest level (1 topo, 2^nativeZoom satellite) */
+  nativePpm: number,
+): Promise<HTMLCanvasElement> {
   const w = cfg.worldUR[0] - cfg.worldBL[0];
   const h = cfg.worldUR[1] - cfg.worldBL[1];
   // Meters-per-pixel doubles per level up from the native tileMaxZoom.
+  const mppAt = (zz: number) => 2 ** (tileMaxZoom - zz) / nativePpm;
   let z = tileMaxZoom;
-  while (z > 0 && Math.max(w, h) / 2 ** (tileMaxZoom - z) > MAX_TEXTURE_PX) z--;
-  const mpp = 2 ** (tileMaxZoom - z);
+  while (z > 0 && Math.max(w, h) / mppAt(z) > MAX_TEXTURE_PX) z--;
+  const mpp = mppAt(z);
   const cw = Math.ceil(w / mpp);
   const ch = Math.ceil(h / mpp);
 

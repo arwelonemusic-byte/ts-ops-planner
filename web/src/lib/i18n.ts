@@ -26,6 +26,8 @@ const EN: Dict = {
   "view.fit": "Fit whole map",
   "view.3d": "3D view",
   "view.2d": "2D view",
+  "view.sat": "Satellite imagery",
+  "view.topo": "Topographic map",
 
   "los.title": "Line of sight",
   "los.visible": "Clear",
@@ -208,6 +210,8 @@ const RU: Dict = {
   "view.fit": "Показать всю карту",
   "view.3d": "3D-вид",
   "view.2d": "2D-вид",
+  "view.sat": "Спутниковый снимок",
+  "view.topo": "Топографическая карта",
 
   "los.title": "Линия видимости",
   "los.visible": "Видимость есть",
