@@ -40,7 +40,9 @@ NAME_RE = re.compile(r"^(?P<prefix>.+)_(?P<x>\d+)_(?P<z>\d+)\.png$")
 
 
 class Heightmap:
-    """Builder heightmap (.bin uint16 + .json): row 0 = north edge, pixel i at i*cellSizeM."""
+    """Builder heightmap (.bin uint16 + .json): row 0 = SOUTH edge (worldZ 0), pixel i at
+    i*cellSizeM — the same convention the Builder's engine-validated heightmap.ts sampler uses
+    (its docstring says north, its code says south; the Chernarus water mask confirmed south)."""
 
     def __init__(self, bin_path: Path):
         meta = json.loads(bin_path.with_suffix(".json").read_text())
@@ -56,7 +58,7 @@ class Heightmap:
         """Bilinear elevation at world (x, z) arrays of equal shape."""
         import cv2
         px = (xs / self.cs).astype(np.float32)
-        py = ((self.h - 1) - zs / self.cs).astype(np.float32)
+        py = (zs / self.cs).astype(np.float32)
         return cv2.remap(self.hm, px, py, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
 
     def at(self, x: float, z: float) -> float:
