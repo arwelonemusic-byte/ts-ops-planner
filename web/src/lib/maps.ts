@@ -174,6 +174,8 @@ export const MAPS: MapConfig[] = [
     heightmapMeta: "/heightmaps/armenhof.json",
     tilePattern: "/tiles/armenhof/{z}/{x}/{y}.jpg",
     tileMaxZoom: 4,
+    // 2026-09-16: 1369 nadir frames (step 100 / 1200 m), ortho-stitched, 4 px/m -> 15360 px.
+    sat: { tilePattern: "/tiles/armenhof-sat/{z}/{x}/{y}.jpg", tileMaxZoom: 6, nativeZoom: 2 },
   },
   {
     key: "alhadra",
