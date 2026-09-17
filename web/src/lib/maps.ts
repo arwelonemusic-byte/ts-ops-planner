@@ -152,6 +152,8 @@ export const MAPS: MapConfig[] = [
     heightmapMeta: "/heightmaps/chernarus.json",
     tilePattern: "/tiles/chernarus/{z}/{x}/{y}.jpg",
     tileMaxZoom: 6,
+    // 2026-09-17: 23716 nadir frames (step 100 / 1200 m), ortho-stitched, 2 px/m -> 30720 px.
+    sat: { tilePattern: "/tiles/chernarus-sat/{z}/{x}/{y}.jpg", tileMaxZoom: 7, nativeZoom: 1 },
   },
   {
     key: "faircroft",
