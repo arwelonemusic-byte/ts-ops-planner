@@ -235,8 +235,8 @@ export const MAPS: MapConfig[] = [
     heightmapMeta: "/heightmaps/merak.json",
     tilePattern: "/tiles/merak/{z}/{x}/{y}.jpg",
     tileMaxZoom: 6,
-    // 2026-09-17: 10609 nadir frames (step 100 / 1200 m), ortho-stitched, 2 px/m -> 20480 px.
-    sat: { tilePattern: "/tiles/merak-sat/{z}/{x}/{y}.jpg", tileMaxZoom: 7, nativeZoom: 1 },
+    // 2026-09-17: 10609 nadir frames (step 100 / 1200 m), ortho-stitched, 4 px/m -> 40960 px.
+    sat: { tilePattern: "/tiles/merak-sat/{z}/{x}/{y}.jpg", tileMaxZoom: 8, nativeZoom: 2 },
   },
   {
     key: "mogadishu",
