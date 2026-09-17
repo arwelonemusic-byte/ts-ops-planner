@@ -40,6 +40,8 @@ export const MAPS: MapConfig[] = [
     heightmapMeta: "/heightmaps/arland.json",
     tilePattern: "/tiles/arland/{z}/{x}/{y}.jpg",
     tileMaxZoom: 5,
+    // 2026-09-17: 882 nadir frames (step 100 / column 200 / 1200 m), ortho-stitched, 4 px/m -> 16400 px.
+    sat: { tilePattern: "/tiles/arland-sat/{z}/{x}/{y}.jpg", tileMaxZoom: 7, nativeZoom: 2 },
   },
   {
     key: "everon",
