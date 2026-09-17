@@ -132,6 +132,8 @@ export const MAPS: MapConfig[] = [
     heightmapMeta: "/heightmaps/ruha.json",
     tilePattern: "/tiles/ruha/{z}/{x}/{y}.jpg",
     tileMaxZoom: 5,
+    // 2026-09-18: 3200 nadir frames (step 100 / column 200 / 1200 m), ortho-stitched, 4 px/m -> 32000 px.
+    sat: { tilePattern: "/tiles/ruha-sat/{z}/{x}/{y}.jpg", tileMaxZoom: 7, nativeZoom: 2 },
   },
   {
     key: "anizay",
