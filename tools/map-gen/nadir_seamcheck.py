@@ -44,6 +44,9 @@ def main():
     ap.add_argument("--fov", type=float, default=15.0)
     ap.add_argument("--samples", type=int, default=40)
     ap.add_argument("--cam-scale", type=float, default=1.0, help="multiply the modelled camera height above terrain (experiment)")
+    ap.add_argument("--x-step", type=float, default=None,
+                    help="column spacing to evaluate (default = --step); e.g. --step 100 --x-step 300 measures the "
+                         "seams a 300 m column step WOULD produce, using every third column of a 100 m capture")
     ap.add_argument("--lag", type=float, default=0.0,
                     help="camera lag (m) along the inner-loop travel direction (+Z): the editor camera has not fully "
                          "arrived when the frame is shot, so the true position is z - lag (first stop of a column: 0)")
@@ -61,7 +64,8 @@ def main():
     fh = cv2.imread(next(iter(frames.values())), cv2.IMREAD_GRAYSCALE).shape[0]
     f_px = (fh / 2.0) / math.tan(math.radians(a.fov) / 2.0)
     ppm = 6.0
-    pairs = [((x, z), (x + step, z), "NS") for (x, z) in frames if (x + step, z) in frames] + \
+    xstep = a.x_step or step
+    pairs = [((x, z), (x + xstep, z), "NS") for (x, z) in frames if (x + xstep, z) in frames] + \
             [((x, z), (x, z + step), "EW") for (x, z) in frames if (x, z + step) in frames]
     random.Random(2).shuffle(pairs)
     zmin = min(k[1] for k in frames)
@@ -80,7 +84,7 @@ def main():
         B = cv2.imread(frames[kb], cv2.IMREAD_GRAYSCALE)
         # world window: 60 m either side of the seam, 200 m along it
         if kind == "NS":
-            sx = ka[0] + step / 2
+            sx = ka[0] + xstep / 2
             wx0, wx1, wz0, wz1 = sx - 60, sx + 60, ka[1] - 100, ka[1] + 100
         else:
             sz = ka[1] + step / 2

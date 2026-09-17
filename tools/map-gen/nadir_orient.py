@@ -52,6 +52,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("indir")
     ap.add_argument("--step", type=float, required=True)
+    ap.add_argument("--step-x", type=float, default=None, help="column spacing (world X) when it differs from --step")
     ap.add_argument("--samples", type=int, default=12)
     ap.add_argument("--seed", type=int, default=1)
     a = ap.parse_args()
@@ -64,13 +65,14 @@ def main() -> None:
     if not frames:
         raise SystemExit("no frames")
     step = int(a.step)
+    step_x = int(a.step_x or a.step)
     rng = random.Random(a.seed)
-    xpairs = [(k, (k[0] + step, k[1])) for k in frames if (k[0] + step, k[1]) in frames]
+    xpairs = [(k, (k[0] + step_x, k[1])) for k in frames if (k[0] + step_x, k[1]) in frames]
     zpairs = [(k, (k[0], k[1] + step)) for k in frames if (k[0], k[1] + step) in frames]
     rng.shuffle(xpairs)
     rng.shuffle(zpairs)
 
-    def sample(pairs, label):
+    def sample(pairs, label, dist):
         vecs = []
         for (ka, kb) in pairs:
             if len(vecs) >= a.samples:
@@ -90,18 +92,18 @@ def main() -> None:
         length = math.hypot(dx, dy)
         ang = math.degrees(math.atan2(dy, dx))  # image coords, y down: clockwise from +x
         angs = np.degrees(np.arctan2(v[:, 1], v[:, 0]))
-        lens = np.hypot(v[:, 0], v[:, 1]) / a.step
+        lens = np.hypot(v[:, 0], v[:, 1]) / dist
         print(f"{label}: {len(vecs)} pairs (NCC median {np.median(v[:, 2]):.2f}); world +axis points ({dx:+.0f}, {dy:+.0f}) px "
-              f"= {length / a.step:.3f} px/m, {ang:+.1f} deg clockwise from image right "
+              f"= {length / dist:.3f} px/m, {ang:+.1f} deg clockwise from image right "
               f"[angle spread {angs.min():+.1f}..{angs.max():+.1f}, px/m spread {lens.min():.2f}..{lens.max():.2f}]")
         return dx, dy, length
 
-    print(f"frames={len(frames)}  step={step} m")
-    x = sample(xpairs, "world +X")
-    z = sample(zpairs, "world +Z")
+    print(f"frames={len(frames)}  step={step} m  column step={step_x} m")
+    x = sample(xpairs, "world +X", step_x)
+    z = sample(zpairs, "world +Z", step)
     if not x:
         return
-    ppm = x[2] / a.step
+    ppm = x[2] / step_x
     ang_x = math.degrees(math.atan2(x[1], x[0]))
     # rotate clockwise by -ang_x so +X points right (angle 0)
     rot_cw = (-ang_x) % 360

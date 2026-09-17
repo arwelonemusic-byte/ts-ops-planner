@@ -70,7 +70,10 @@ def main() -> None:
     ap.add_argument("indir")
     ap.add_argument("out")
     ap.add_argument("--world", type=float, required=True, help="world size in metres (square)")
-    ap.add_argument("--step", type=float, default=100.0, help="camera step in metres")
+    ap.add_argument("--step", type=float, default=100.0, help="camera step along a column (world Z) in metres")
+    ap.add_argument("--step-x", type=float, default=None,
+                    help="column spacing (world X) in metres when the plugin's column step differs from --step "
+                         "(default = --step); crops become step-x wide by step tall")
     ap.add_argument("--ppm", type=float, help="flat mode: measured pixels per metre in the raw frames")
     ap.add_argument("--scale", type=float, default=1.0, help="output scale (0.125 = preview)")
     ap.add_argument("--rot", type=float, default=90.0,
@@ -110,9 +113,12 @@ def main() -> None:
         if not a.ppm:
             sys.exit("flat mode needs --ppm (or pass --heightmap for ortho mode)")
         native_ppm = a.ppm
-    crop = int(round(a.step * native_ppm))          # px per tile in raw frame
-    tile = max(1, int(round(crop * a.scale)))       # px per tile in output
+    step_x = a.step_x or a.step
+    crop = int(round(a.step * native_ppm))          # px per tile (Z extent) in the raw frame
+    crop_x = int(round(step_x * native_ppm))        # px per tile (X extent) in the raw frame
+    tile = max(1, int(round(crop * a.scale)))       # px per tile (Z) in output
     out_ppm = tile / a.step
+    tile_x = max(1, int(round(step_x * out_ppm)))   # X derived from the SAME px/m so the grid stays exact
     # Canvas = the whole world (0..world on both axes) unless --bbox narrows it;
     # placement below is always computed in world metres, then shifted by the
     # bbox origin, so a bbox render is pixel-identical to the matching cut of
@@ -120,7 +126,7 @@ def main() -> None:
     x0, z0, x1, z1 = a.bbox if a.bbox else (0.0, 0.0, a.world, a.world)
     size_x = int(round((x1 - x0) * out_ppm))
     size_z = int(round((z1 - z0) * out_ppm))
-    print(f"frames={len(frames)} crop={crop}px tile={tile}px out={size_x}x{size_z} ({out_ppm:.3f} px/m)")
+    print(f"frames={len(frames)} crop={crop_x}x{crop}px tile={tile_x}x{tile}px out={size_x}x{size_z} ({out_ppm:.3f} px/m)")
     mosaic = Image.new("RGB", (size_x, size_z), (13, 15, 17))
 
     # Image-space unit vectors of world +X and +Z (y down). nadir_orient.py
@@ -136,13 +142,14 @@ def main() -> None:
     if hm is not None:
         import cv2
         # world coords of output pixel centres inside one tile (west→east, north→south)
-        loc = (np.arange(tile, dtype=np.float32) + 0.5) / out_ppm - a.step / 2.0
-        DX, DZ = np.meshgrid(loc, -loc)          # DZ: row 0 = north = +step/2
+        loc_x = (np.arange(tile_x, dtype=np.float32) + 0.5) / out_ppm - step_x / 2.0
+        loc_z = (np.arange(tile, dtype=np.float32) + 0.5) / out_ppm - a.step / 2.0
+        DX, DZ = np.meshgrid(loc_x, -loc_z)      # DZ: row 0 = north = +step/2
 
     for i, f in enumerate(frames):
         m = NAME_RE.match(f.name)
         x, z = float(m["x"]), float(m["z"])
-        if x + a.step / 2 <= x0 or x - a.step / 2 >= x1 or z + a.step / 2 <= z0 or z - a.step / 2 >= z1:
+        if x + step_x / 2 <= x0 or x - step_x / 2 >= x1 or z + a.step / 2 <= z0 or z - a.step / 2 >= z1:
             continue
         if hm is not None:
             frame = cv2.imread(str(f), cv2.IMREAD_COLOR)
@@ -157,25 +164,28 @@ def main() -> None:
         else:
             im = Image.open(f)
             w, h = im.size
-            # Rotate a larger centred square first so the final crop has no empty
-            # corners for non-90° angles (source needed = crop·(|cos|+|sin|)).
+            # Rotate a larger centred region first so the final crop has no empty
+            # corners: the crop_x×crop rectangle, rotated back into the frame, needs
+            # a bounding box of (crop_x|cos| + crop|sin|) × (crop_x|sin| + crop|cos|).
             th = math.radians(a.rot)
-            src = int(math.ceil(crop * (abs(math.cos(th)) + abs(math.sin(th))))) + 2
-            if src > min(w, h):
-                sys.exit(f"crop {crop}px rotated by {a.rot}° needs a {src}px square but frames are {w}x{h}: reduce --step")
+            need_w = int(math.ceil(crop_x * abs(math.cos(th)) + crop * abs(math.sin(th)))) + 2
+            need_h = int(math.ceil(crop_x * abs(math.sin(th)) + crop * abs(math.cos(th)))) + 2
+            if need_w > w or need_h > h:
+                sys.exit(f"crop {crop_x}x{crop}px rotated by {a.rot}° needs {need_w}x{need_h}px but frames are {w}x{h}: reduce --step/--step-x")
+            src = max(need_w, need_h)
             l, t = (w - src) // 2, (h - src) // 2
             c = im.crop((l, t, l + src, t + src))
             if a.rot % 360:
                 c = c.rotate(-a.rot, resample=Image.BICUBIC)   # PIL rotates CCW; negative = CW; same size, about the centre
-            o = (src - crop) // 2
-            c = c.crop((o, o, o + crop, o + crop))
+            ox, oz = (src - crop_x) // 2, (src - crop) // 2
+            c = c.crop((ox, oz, ox + crop_x, oz + crop))
             if a.flipx:
                 c = c.transpose(Image.FLIP_LEFT_RIGHT)
             if a.flipz:
                 c = c.transpose(Image.FLIP_TOP_BOTTOM)
-            if tile != crop:
-                c = c.resize((tile, tile), Image.LANCZOS)
-        px = int(round((x - a.step / 2 - x0) * out_ppm))
+            if tile != crop or tile_x != crop_x:
+                c = c.resize((tile_x, tile), Image.LANCZOS)
+        px = int(round((x - step_x / 2 - x0) * out_ppm))
         py = int(round((z1 - (z + a.step / 2)) * out_ppm))  # north (max Z) at the top
         mosaic.paste(c, (px, py))
         if i % 200 == 0:
