@@ -171,6 +171,8 @@ export const MAPS: MapConfig[] = [
     heightmapMeta: "/heightmaps/faircroft.json",
     tilePattern: "/tiles/faircroft/{z}/{x}/{y}.jpg",
     tileMaxZoom: 6,
+    // 2026-09-18: 8192 nadir frames (step 100 / column 200 / 1200 m), ortho-stitched, 4 px/m -> 51200 px.
+    sat: { tilePattern: "/tiles/faircroft-sat/{z}/{x}/{y}.jpg", tileMaxZoom: 8, nativeZoom: 2 },
   },
   {
     key: "armenhof",
