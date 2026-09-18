@@ -77,6 +77,8 @@ export const MAPS: MapConfig[] = [
     heightmapMeta: "/heightmaps/zarichne.json",
     tilePattern: "/tiles/zarichne/{z}/{x}/{y}.jpg",
     tileMaxZoom: 5,
+    // 2026-09-18: 1058 nadir frames (step 100 / column 200 / 1000 m), ortho-stitched, 4 px/m -> 18400 px.
+    sat: { tilePattern: "/tiles/zarichne-sat/{z}/{x}/{y}.jpg", tileMaxZoom: 7, nativeZoom: 2 },
   },
   {
     key: "zargabad",
