@@ -53,6 +53,8 @@ export const MAPS: MapConfig[] = [
     heightmapMeta: "/heightmaps/everon.json",
     tilePattern: "/tiles/everon/{z}/{x}/{y}.jpg",
     tileMaxZoom: 6,
+    // 2026-09-19: 8450 nadir frames (step 100 / column 200 / 1000 m), ortho-stitched, 4 px/m -> 52000 px.
+    sat: { tilePattern: "/tiles/everon-sat/{z}/{x}/{y}.jpg", tileMaxZoom: 8, nativeZoom: 2 },
   },
   {
     key: "kolguyev",
