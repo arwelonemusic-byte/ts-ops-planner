@@ -125,6 +125,8 @@ export const MAPS: MapConfig[] = [
     heightmapMeta: "/heightmaps/takistan.json",
     tilePattern: "/tiles/takistan/{z}/{x}/{y}.jpg",
     tileMaxZoom: 6,
+    // 2026-09-19: 8256 nadir frames (step 100 / column 200 / 1000 m), ortho-stitched, 2 px/m -> 25800 px.
+    sat: { tilePattern: "/tiles/takistan-sat/{z}/{x}/{y}.jpg", tileMaxZoom: 7, nativeZoom: 1 },
   },
   {
     key: "ruha",
