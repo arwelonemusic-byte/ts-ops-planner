@@ -234,6 +234,8 @@ export const MAPS: MapConfig[] = [
     heightmapMeta: "/heightmaps/kunar.json",
     tilePattern: "/tiles/kunar/{z}/{x}/{y}.jpg",
     tileMaxZoom: 4,
+    // 2026-09-19: 800 nadir frames (step 100 / column 200 / 1200 m), ortho-stitched, 4 px/m -> 16000 px.
+    sat: { tilePattern: "/tiles/kunar-sat/{z}/{x}/{y}.jpg", tileMaxZoom: 6, nativeZoom: 2 },
   },
   {
     key: "merak",
