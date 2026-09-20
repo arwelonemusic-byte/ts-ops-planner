@@ -114,6 +114,8 @@ export const MAPS: MapConfig[] = [
     heightmapMeta: "/heightmaps/serhiivka.json",
     tilePattern: "/tiles/serhiivka/{z}/{x}/{y}.jpg",
     tileMaxZoom: 6,
+    // 2026-09-20: 5000 nadir frames (step 100 / column 200 / 1200 m), ortho-stitched, 4 px/m -> 40000 px.
+    sat: { tilePattern: "/tiles/serhiivka-sat/{z}/{x}/{y}.jpg", tileMaxZoom: 8, nativeZoom: 2 },
   },
   {
     key: "takistan",
