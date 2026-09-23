@@ -292,6 +292,8 @@ export const MAPS: MapConfig[] = [
     heightmapMeta: "/heightmaps/westzagoria.json",
     tilePattern: "/tiles/westzagoria/{z}/{x}/{y}.jpg",
     tileMaxZoom: 5,
+    // 2026-09-23: 1152 nadir frames (step 100 / column 200 / 1200 m), ortho-stitched, 4 px/m -> 18432 px.
+    sat: { tilePattern: "/tiles/westzagoria-sat/{z}/{x}/{y}.jpg", tileMaxZoom: 7, nativeZoom: 2 },
   },
 ];
 
