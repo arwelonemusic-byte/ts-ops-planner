@@ -205,6 +205,8 @@ export const MAPS: MapConfig[] = [
     heightmapMeta: "/heightmaps/alhadra.json",
     tilePattern: "/tiles/alhadra/{z}/{x}/{y}.jpg",
     tileMaxZoom: 5,
+    // 2026-09-23: 3362 nadir frames (step 100 / column 200 / 1000 m), ortho-stitched, 4 px/m -> 32768 px.
+    sat: { tilePattern: "/tiles/alhadra-sat/{z}/{x}/{y}.jpg", tileMaxZoom: 7, nativeZoom: 2 },
   },
   {
     key: "seitenbuch",
