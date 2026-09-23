@@ -218,6 +218,8 @@ export const MAPS: MapConfig[] = [
     heightmapMeta: "/heightmaps/seitenbuch.json",
     tilePattern: "/tiles/seitenbuch/{z}/{x}/{y}.jpg",
     tileMaxZoom: 4,
+    // 2026-09-23: 400 nadir frames (step 100 / column 200 / 1000 m), ortho-stitched, 4 px/m -> 16000x8000 px.
+    sat: { tilePattern: "/tiles/seitenbuch-sat/{z}/{x}/{y}.jpg", tileMaxZoom: 6, nativeZoom: 2 },
   },
   {
     key: "iraq1990",
