@@ -103,8 +103,8 @@ export type ReplayMeta = {
    *  so a session's commander-pushed plan auto-resolves without manual
    *  paste. Empty / absent on legacy replays and on sessions where no
    *  /syncplan was ever run — viewer falls back to user-entered code in
-   *  those cases. (Mod-side stamping is not yet implemented; field is
-   *  reserved here for forward compatibility — see ARCHITECTURE.md.) */
+   *  those cases. Absent on every replay recorded 2026-07-19 → 2026-10-06:
+   *  the plan GET stopped returning `code`, which the mod needs to stamp. */
   planCode?: string;
 };
 

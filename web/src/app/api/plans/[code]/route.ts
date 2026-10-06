@@ -23,5 +23,10 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json(result[0].data);
+  // Echo the row's code into the body. The mod stamps the active replay
+  // (meta.planCode) only when the fetched plan carries `code`, and since the
+  // POST went server-mint the stored data no longer has one — without this,
+  // every /syncplan silently skipped the stamp. Placed last so it wins over
+  // any stale `code` an old client left in `data`.
+  return NextResponse.json({ ...result[0].data, code });
 }

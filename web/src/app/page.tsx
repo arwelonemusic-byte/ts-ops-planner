@@ -1415,9 +1415,7 @@ export default function Page() {
       setReplayPlanCodeInput(stampedCode);
       setReplayPlanCodeError(null);
       // Auto-load the stamped plan so toggling "Plan" on immediately shows
-      // the commander's pushed plan without a manual paste. Today the mod
-      // doesn't yet stamp planCode so this branch is a no-op; the input
-      // path remains the only way to load a plan in the replay panel.
+      // the commander's pushed plan without a manual paste.
       if (stampedCode) void handleLoadReplayPlanCode(stampedCode);
     }
     // handleLoadReplayPlanCode is referentially stable enough; including
@@ -2341,9 +2339,8 @@ export default function Page() {
 
               {/* Plan row: toggle + opacity slider + plan code input. The
                   plan code is pre-filled from `replay.meta.planCode` when
-                  the mod stamped one (future feature — see
-                  ReplayMeta.planCode); today it's empty and the user
-                  pastes a code to load a plan as overlay. Markers/lines
+                  the mod stamped one (see ReplayMeta.planCode); otherwise
+                  the user pastes a code to load a plan as overlay. Markers/lines
                   render via the existing `mode === "plan" || showPlan`
                   gate around `renderable*` — in BOTH viewports since the
                   3D view learned to render plan content. */}
