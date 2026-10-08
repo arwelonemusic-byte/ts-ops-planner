@@ -162,7 +162,9 @@ export const MAPS: MapConfig[] = [
     imagePath: "/chernarus_final.jpg",
     worldBL: [0, 0],
     worldUR: [15360, 15360],
-    heightmapBin: "/heightmaps/chernarus.bin",
+    // ?v=2: cache-buster for the 2026-10-08 re-ship from the map's 2.1.3
+    // terrain (Caddy sends no Cache-Control, browsers would keep the old bytes).
+    heightmapBin: "/heightmaps/chernarus.bin?v=2",
     heightmapMeta: "/heightmaps/chernarus.json",
     tilePattern: "/tiles/chernarus/{z}/{x}/{y}.jpg",
     tileMaxZoom: 6,
