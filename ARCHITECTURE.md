@@ -76,6 +76,7 @@ Three independent components, two independent marker channels. **Do not conflate
 CREATE TABLE plans (
   code       TEXT PRIMARY KEY,
   data       JSONB NOT NULL,
+  lineage    TEXT,               -- sha256 of a TS Hub plan key (2026-10-09; see CLAUDE.md "TS Hub hand-off")
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```

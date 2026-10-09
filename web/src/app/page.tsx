@@ -60,7 +60,14 @@ import {
   normalizePlan,
   type LoadedPlan,
 } from "@/components/ImportCodeDialog";
-import type { ImportResult, ImportedPolygon } from "@/lib/layerImport";
+import { parseMarkersLayer, type ImportResult, type ImportedPolygon } from "@/lib/layerImport";
+import {
+  fetchHubMission,
+  hubPageUrl,
+  normalizeHubContext,
+  type HubContext,
+  type HubMission,
+} from "@/lib/hubLink";
 import { useT } from "@/components/LanguageProvider";
 import { LOCALES, type Locale } from "@/lib/i18n";
 import type { HeightmapSampler } from "@/lib/heightmap";
@@ -111,8 +118,23 @@ const STORAGE_KEY_MAP = "ts-ops-planner-map-v1";
 const STORAGE_KEY_IMPORTED = "ts-ops-planner-imported-v1";
 const STORAGE_KEY_POLYGONS = "ts-ops-planner-polygons-v1";
 const STORAGE_KEY_LABEL_COLOR = "ts-ops-planner-label-color-v1";
+/** TS Hub plan the canvas belongs to (lib/hubLink.ts) — survives reloads so
+ *  later pushes still land in the same hub plan. */
+const STORAGE_KEY_HUB = "ts-ops-planner-hub-v1";
+/** Code of the push (or loaded plan) the canvas still matches — every edit
+ *  clears it. Persisted so a reload still knows the canvas has no unpushed
+ *  work when the hub reopens the same plan. */
+const STORAGE_KEY_SAVED_CODE = "ts-ops-planner-saved-code-v1";
 /** SAT basemap preference (not part of the plan — a display choice). */
 const STORAGE_KEY_SAT = "ts-ops-planner-sat-v1";
+
+type ReplayOverlay = {
+  markers: PlacedMarker[];
+  lines: PlacedLine[];
+  importedMarkers: PlacedMarker[];
+  polygons: ImportedPolygon[];
+};
+const EMPTY_REPLAY_OVERLAY: ReplayOverlay = { markers: [], lines: [], importedMarkers: [], polygons: [] };
 
 /** Global text color for marker labels. Web-only — does not get pushed to the
  *  mod. Lets the user flip to white when the basemap is dark enough that black
@@ -419,6 +441,16 @@ export default function Page() {
   // handleLoadReplayPlanCode below.
   const [replayPlanCodeInput, setReplayPlanCodeInput] = useState("");
   const [replayPlanCodeError, setReplayPlanCodeError] = useState<string | null>(null);
+  // What the Plan toggle shows in replay mode: the session's plan plus its
+  // mission's Markers.layer. Its own state — watching a replay never touches
+  // the planning canvas (which used to double as the overlay, so a layer
+  // only showed if one happened to be imported for planning).
+  const [replayOverlay, setReplayOverlay] = useState<ReplayOverlay>(EMPTY_REPLAY_OVERLAY);
+  // TS Hub replay links add the game: ?replay=CODE&mission=<id>&plan=<code>.
+  // Applies only to that replay, not to others picked later from the panel.
+  const replayLinkRef = useRef<{ code: string; missionId: string | null; planCode: string | null } | null>(null);
+  // Mission whose Markers.layer the overlay shows (or is fetching).
+  const replayLayerMissionRef = useRef<string | null>(null);
   // Event log expand/collapse lives at this level so the sidebar layout
   // can grow the log's wrapper to fill the remaining viewport height only
   // when it's expanded (otherwise the collapsed header would leave a
@@ -474,6 +506,12 @@ export default function Page() {
   const [saving, setSaving] = useState(false);
   const [savedCode, setSavedCode] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [hubCtx, setHubCtx] = useState<HubContext | null>(null);
+  const [hubError, setHubError] = useState<string | null>(null);
+  // While a hub link resolves the map, Leaflet isn't mounted: swapping maps
+  // (a MapContainer remount) during its opening zoom animation throws
+  // Leaflet's `_leaflet_pos` error. Set at hydration, cleared by openFromHub.
+  const [hubHold, setHubHold] = useState(false);
 
   // Hydrate from localStorage once on mount.
   useEffect(() => {
@@ -506,6 +544,13 @@ export default function Page() {
       const storedLabelColor = localStorage.getItem(STORAGE_KEY_LABEL_COLOR);
       if (storedLabelColor === "black" || storedLabelColor === "white") {
         setLabelColor(storedLabelColor);
+      }
+      const storedHub = localStorage.getItem(STORAGE_KEY_HUB);
+      if (storedHub) setHubCtx(normalizeHubContext(JSON.parse(storedHub)));
+      setSavedCode(localStorage.getItem(STORAGE_KEY_SAVED_CODE));
+      const linkParams = new URLSearchParams(window.location.search);
+      if (!linkParams.has("replay") && (linkParams.has("mission") || linkParams.has("plan"))) {
+        setHubHold(true);
       }
     } catch {
       // ignore
@@ -573,6 +618,26 @@ export default function Page() {
       // ignore
     }
   }, [labelColor, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      if (hubCtx) localStorage.setItem(STORAGE_KEY_HUB, JSON.stringify(hubCtx));
+      else localStorage.removeItem(STORAGE_KEY_HUB);
+    } catch {
+      // ignore
+    }
+  }, [hubCtx, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try {
+      if (savedCode) localStorage.setItem(STORAGE_KEY_SAVED_CODE, savedCode);
+      else localStorage.removeItem(STORAGE_KEY_SAVED_CODE);
+    } catch {
+      // ignore
+    }
+  }, [savedCode, hydrated]);
 
   // Keyboard shortcuts:
   //   Q / W / E — switch to Marker / Line / Ruler tool
@@ -1098,6 +1163,17 @@ export default function Page() {
   function handleLoadPlan(plan: LoadedPlan) {
     // Replace placed markers + lines with the loaded plan. Imported .layer
     // content (initial markers, polygons) is a separate channel and stays put.
+    const { markers: newMarkers, lines: newLines } = placedFromPlan(plan);
+    setMarkers(newMarkers);
+    setLines(newLines);
+    setSelectedId(null);
+    setSelectedLineId(null);
+    setDraftPoints([]);
+    setSavedCode(plan.code);
+    setSaveError(null);
+  }
+
+  function placedFromPlan(plan: LoadedPlan): { markers: PlacedMarker[]; lines: PlacedLine[] } {
     const newMarkers: PlacedMarker[] = plan.markers.map((m) => {
       if (m.kind === "military") {
         return {
@@ -1129,13 +1205,7 @@ export default function Page() {
       width: l.widthIndex as LineWidth,
       points: l.points,
     }));
-    setMarkers(newMarkers);
-    setLines(newLines);
-    setSelectedId(null);
-    setSelectedLineId(null);
-    setDraftPoints([]);
-    setSavedCode(plan.code);
-    setSaveError(null);
+    return { markers: newMarkers, lines: newLines };
   }
 
   async function save() {
@@ -1147,6 +1217,11 @@ export default function Page() {
         schemaVersion: 1,
         // No `code` field: server mints a fresh unique 6-char code per push.
         // Commander hands that code to the admin for `/syncplan <code>`.
+        // Web-side context the mod ignores (unregistered JSON keys): the map,
+        // and the TS Hub mission + plan key when the canvas came from the hub.
+        mapKey,
+        ...(hubCtx ? { mission: hubCtx.missionId } : {}),
+        ...(hubCtx?.key ? { planKey: hubCtx.key } : {}),
         markers: markers.map((m) => {
           if (m.kind === "military") {
             return {
@@ -1231,13 +1306,18 @@ export default function Page() {
   // In replay mode the plan overlay (when toggled on) must be non-interactive,
   // so placed markers are forced read-only — defense in depth alongside the
   // markersInteractive prop gate below.
+  // In replay mode everything comes from the replay's own overlay.
   const planReadOnly = mode === "replay";
+  const shown =
+    mode === "replay"
+      ? replayOverlay
+      : { markers, lines, importedMarkers, polygons: importedPolygons };
   const renderable: RenderableMarker[] = [
-    ...importedMarkers.map((m) => toRenderable(m, true)),
-    ...markers.map((m) => toRenderable(m, planReadOnly)),
+    ...shown.importedMarkers.map((m) => toRenderable(m, true)),
+    ...shown.markers.map((m) => toRenderable(m, planReadOnly)),
   ];
 
-  const renderablePolygons: RenderablePolygon[] = importedPolygons.map((p) => ({
+  const renderablePolygons: RenderablePolygon[] = shown.polygons.map((p) => ({
     id: p.id,
     points: p.points,
     fillColor: p.fillColor,
@@ -1249,7 +1329,7 @@ export default function Page() {
   }));
 
   // Renderable lines for the map: append in-progress draft rubber-band if drafting.
-  const renderableLines: RenderableLine[] = lines.map((l) => ({
+  const renderableLines: RenderableLine[] = shown.lines.map((l) => ({
     id: l.id,
     color: findColor(l.colorName).hex,
     widthMeters: LINE_WIDTH_METERS[l.width],
@@ -1411,9 +1491,15 @@ export default function Page() {
       // when present (forward-compat — see ReplayMeta.planCode docs). Falls
       // back to empty so the user can paste a code manually on legacy
       // replays / sessions where /syncplan never ran.
-      const stampedCode = replay.meta?.planCode ?? "";
+      // A TS Hub link's game plan fills in when nothing was stamped (the
+      // stamp is what was actually synced in-game, so it wins).
+      const link = replayLinkRef.current?.code === replay.code ? replayLinkRef.current : null;
+      const stampedCode = replay.meta?.planCode || link?.planCode || "";
       setReplayPlanCodeInput(stampedCode);
       setReplayPlanCodeError(null);
+      setReplayOverlay(EMPTY_REPLAY_OVERLAY);
+      replayLayerMissionRef.current = null;
+      if (link?.missionId) void loadReplayLayer(link.missionId);
       // Auto-load the stamped plan so toggling "Plan" on immediately shows
       // the commander's pushed plan without a manual paste.
       if (stampedCode) void handleLoadReplayPlanCode(stampedCode);
@@ -1552,9 +1638,14 @@ export default function Page() {
     const current = url.searchParams.get("replay");
     if (replay && current !== replay.code) {
       url.searchParams.set("replay", replay.code);
+      // ?mission / ?plan came with the hub link and describe its replay only.
+      url.searchParams.delete("mission");
+      url.searchParams.delete("plan");
       window.history.replaceState(null, "", url.toString());
     } else if (!replay && current) {
       url.searchParams.delete("replay");
+      url.searchParams.delete("mission");
+      url.searchParams.delete("plan");
       window.history.replaceState(null, "", url.toString());
     }
   }, [replay]);
@@ -1647,9 +1738,32 @@ export default function Page() {
         return;
       }
       const raw = await res.json();
-      handleLoadPlan(normalizePlan(raw, code));
+      const placed = placedFromPlan(normalizePlan(raw, code));
+      setReplayOverlay((o) => ({ ...o, ...placed }));
+      // Plans pushed from TS Hub links name their mission: show its layer too.
+      if (!replayLayerMissionRef.current && typeof raw?.mission === "string") {
+        void loadReplayLayer(raw.mission);
+      }
     } catch {
       setReplayPlanCodeError("failed");
+    }
+  }
+
+  /** The mission's Markers.layer from TS Hub into the replay overlay. Quiet on
+   *  failure (hub unreachable, no layer): the overlay just shows the plan. */
+  async function loadReplayLayer(missionId: string) {
+    replayLayerMissionRef.current = missionId;
+    try {
+      const mission = await fetchHubMission(missionId);
+      const layer = mission.layer ? parseMarkersLayer(mission.layer) : null;
+      if (replayLayerMissionRef.current !== missionId) return;
+      setReplayOverlay((o) => ({
+        ...o,
+        importedMarkers: layer?.markers ?? [],
+        polygons: layer?.polygons ?? [],
+      }));
+    } catch {
+      // ignore
     }
   }
 
@@ -1664,11 +1778,136 @@ export default function Page() {
     const code = params.get("replay");
     mountProcessedRef.current = true;
     if (!code) return;
+    replayLinkRef.current = {
+      code: code.toUpperCase(),
+      missionId: params.get("mission"),
+      planCode: params.get("plan")?.trim().toUpperCase() || null,
+    };
     setReplayCodeInput(code.toUpperCase());
     switchMode("replay");
     void handleLoadReplay(code);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // TS Hub hand-off (lib/hubLink.ts): ?mission=…&plan=…&key=…&event=…
+  // Runs once, after localStorage hydration, so it can tell whether the
+  // canvas holds unpushed work worth asking about. A replay link wins.
+  const hubLinkProcessedRef = useRef(false);
+  useEffect(() => {
+    if (!hydrated || hubLinkProcessedRef.current) return;
+    hubLinkProcessedRef.current = true;
+    const url = new URL(window.location.href);
+    const p = url.searchParams;
+    if (p.get("replay")) return;
+    const missionId = p.get("mission");
+    const planCode = p.get("plan")?.trim().toUpperCase() || null;
+    if (!missionId && !planCode) return;
+    const key = p.get("key");
+    // The key is a write capability for the hub plan: keep it out of the
+    // address bar (and screenshots of it). It lives on in hubCtx.
+    if (key) {
+      p.delete("key");
+      window.history.replaceState(null, "", url.toString());
+    }
+    void openFromHub(missionId, planCode, key, p.get("event")).finally(() =>
+      setHubHold(false),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated]);
+
+  async function openFromHub(
+    missionId: string | null,
+    planCode: string | null,
+    key: string | null,
+    eventId: string | null,
+  ) {
+    setHubError(null);
+    let mission: HubMission | null = null;
+    if (missionId) {
+      try {
+        mission = await fetchHubMission(missionId);
+      } catch {
+        setHubError(t("hub.error.mission"));
+        return;
+      }
+    }
+    let plan: LoadedPlan | null = null;
+    let planMapKey: string | null = null;
+    if (planCode) {
+      try {
+        const res = await fetch(`/api/plans/${encodeURIComponent(planCode)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const raw = await res.json();
+        plan = normalizePlan(raw, planCode);
+        if (typeof raw?.mapKey === "string") planMapKey = raw.mapKey;
+      } catch {
+        setHubError(t("hub.error.plan", { code: planCode }));
+        return;
+      }
+    }
+    const targetMap = mission?.mapKey ?? planMapKey;
+    if (targetMap && !MAPS.some((m) => m.key === targetMap)) {
+      setHubError(t("hub.error.map", { map: targetMap }));
+      return;
+    }
+
+    // Same hub plan as the canvas already holds: keep what's drawn, unless
+    // the hub has a newer pushed version. Anything else replaces the canvas,
+    // asking first only when there's unpushed work to lose.
+    const samePlan = !!key && hubCtx?.key === key;
+    const unpushed = savedCode === null && (markers.length > 0 || lines.length > 0);
+    let loadDrawing: boolean;
+    if (samePlan) {
+      loadDrawing =
+        !!plan &&
+        plan.code !== savedCode &&
+        (!unpushed || confirm(t("hub.confirm.newer", { code: plan.code })));
+    } else {
+      const name = mission?.name ?? planCode ?? "";
+      if (unpushed && !confirm(t("hub.confirm.replace", { name }))) return;
+      loadDrawing = true;
+    }
+
+    if (mode !== "plan") switchMode("plan");
+    if (targetMap && targetMap !== mapKey) {
+      setMapKey(targetMap);
+      setSelectedId(null);
+      setSelectedLineId(null);
+      setDraftPoints([]);
+    }
+    if (mission) {
+      // The hub is the source of truth for the mission's own markers.
+      let layer: ImportResult = { markers: [], polygons: [], warnings: [] };
+      if (mission.layer) {
+        try {
+          layer = parseMarkersLayer(mission.layer);
+        } catch {
+          setHubError(t("hub.error.layer"));
+        }
+      }
+      setImportedMarkers(layer.markers);
+      setImportedPolygons(layer.polygons);
+    }
+    if (loadDrawing) {
+      if (plan) {
+        handleLoadPlan(plan);
+      } else {
+        setMarkers([]);
+        setLines([]);
+        setSelectedId(null);
+        setSelectedLineId(null);
+        setDraftPoints([]);
+        setSavedCode(null);
+      }
+    }
+    if (!samePlan) {
+      setHubCtx(
+        mission
+          ? { missionId: mission.id, missionName: mission.name, eventId, key }
+          : null,
+      );
+    }
+  }
 
   // Fetch the recent-replays list whenever we enter replay mode without a
   // loaded replay (and refetch when unloading one). Refetch on unload picks
@@ -1974,6 +2213,11 @@ export default function Page() {
         {saveError && (
           <div className="rounded-[8px] bg-red-900/40 border border-red-700 p-3 text-[12px] text-red-100">
             {t("push.error", { message: saveError })}
+          </div>
+        )}
+        {hubError && (
+          <div className="rounded-[8px] bg-red-900/40 border border-red-700 p-3 text-[12px] text-red-100">
+            {hubError}
           </div>
         )}
       </div>
@@ -2481,7 +2725,7 @@ export default function Page() {
             survives the round-trip; 3D mounts on demand with the 2D
             viewport handed over via initialView. */}
         <div className={`absolute inset-0 ${view3D ? "hidden" : ""}`}>
-        <MapClient
+        {hubHold ? <MapLoadingFallback /> : <MapClient
           mapConfig={effectiveMapConfig}
           labelColor={labelColor}
           markers={mode === "plan" || showPlan ? renderable : []}
@@ -2526,7 +2770,7 @@ export default function Page() {
           onToggleView={() => setView3D(!view3D)}
           satLayer={satLayer}
           onToggleSat={toggleSat}
-        />
+        />}
         </div>
         {view3D && (
           <MapClient3D
@@ -2788,6 +3032,11 @@ export default function Page() {
           </div>
         )}
 
+        {/* The TS Hub plan this canvas pushes into (lib/hubLink.ts). */}
+        {mode === "plan" && hubCtx?.key && (
+          <HubPlanCard ctx={hubCtx} onDetach={() => setHubCtx(null)} />
+        )}
+
         {/* Push to Reforger — desktop only, plan-mode only. */}
         {mode === "plan" && (
           <button
@@ -2977,6 +3226,7 @@ export default function Page() {
       {savedCode && pushedModalOpen && (
         <PushedModal
           code={savedCode}
+          hub={hubCtx?.key ? hubCtx : null}
           onClose={() => setPushedModalOpen(false)}
         />
       )}
@@ -3064,7 +3314,47 @@ function ChevronDown({ size = 12 }: { size?: number }) {
 /** Success popup shown after Push. Surfaces the server-minted code with a
  *  one-click "copy /syncplan <code>" button — commanders paste that directly
  *  into Discord/comms so the admin has no chance to mistype it. */
-function PushedModal({ code, onClose }: { code: string; onClose: () => void }) {
+/** Desktop sidebar card above Push: which TS Hub plan new pushes join. */
+function HubPlanCard({ ctx, onDetach }: { ctx: HubContext; onDetach: () => void }) {
+  const { t } = useT();
+  return (
+    <div className="hidden md:flex pointer-events-auto shrink-0 items-center gap-3 rounded-[12px] bg-[#202427] px-4 py-3">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-[11px] leading-[16px] text-white/60">
+          {t(ctx.eventId ? "hub.card.event" : "hub.card.mission")}
+        </span>
+        <a
+          href={hubPageUrl(ctx)}
+          target="_blank"
+          rel="noreferrer"
+          className="truncate text-[14px] leading-[20px] font-medium text-white hover:text-[#f4db50]"
+        >
+          {ctx.missionName}
+        </a>
+      </div>
+      <button
+        type="button"
+        onClick={onDetach}
+        title={t("hub.card.detach")}
+        aria-label={t("hub.card.detach")}
+        className="shrink-0 text-white/30 hover:text-white text-[14px] leading-none"
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
+function PushedModal({
+  code,
+  hub,
+  onClose,
+}: {
+  code: string;
+  /** Set when the push became a new version of a TS Hub plan. */
+  hub: HubContext | null;
+  onClose: () => void;
+}) {
   const { t } = useT();
   const [copied, setCopied] = useState(false);
   useEffect(() => {
@@ -3122,6 +3412,19 @@ function PushedModal({ code, onClose }: { code: string; onClose: () => void }) {
             {copied ? t("push.success.copied") : t("push.success.copy")}
           </span>
         </button>
+        {hub && (
+          <p className="text-[12px] leading-[18px] text-white/60">
+            {t("hub.pushed", { name: hub.missionName })}{" "}
+            <a
+              href={hubPageUrl(hub)}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[#f4db50] hover:underline"
+            >
+              {t("hub.open")}
+            </a>
+          </p>
+        )}
       </div>
     </div>
   );

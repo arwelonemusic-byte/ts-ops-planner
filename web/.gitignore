@@ -45,3 +45,6 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+# dev-only stand-in for the plans table (lib/devPlans.ts)
+/.dev-plans.json

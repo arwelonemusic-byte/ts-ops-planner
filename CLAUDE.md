@@ -378,9 +378,16 @@ The panel UI is designed to match Figma file `hHh1bKwcTXbhuwOVnoP1ZL`. Key token
 Two tables in the box-local PostgreSQL (database `ops_planner`), one row per saved artefact each:
 
 ```
-plans(   code TEXT PRIMARY KEY, data JSONB NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())
+plans(   code TEXT PRIMARY KEY, data JSONB NOT NULL, lineage TEXT, created_at TIMESTAMPTZ DEFAULT NOW())
 replays( code TEXT PRIMARY KEY, world TEXT, meta JSONB, events JSONB, created_at TIMESTAMPTZ DEFAULT NOW())
 ```
+
+`plans.lineage` (added 2026-10-09 for the TS Hub hand-off, below) must exist in prod before deploying that code — run once on the box:
+```sql
+ALTER TABLE plans ADD COLUMN IF NOT EXISTS lineage TEXT;
+CREATE INDEX IF NOT EXISTS plans_lineage_idx ON plans (lineage, created_at DESC);
+```
+Untagged pushes still use the old INSERT, so only hub-tagged pushes would fail without it. With no `DATABASE_URL` in dev, plans go to `web/.dev-plans.json` (`lib/devPlans.ts`, gitignored) so pushes work locally.
 
 `plans.data` stores the full plan JSON as posted. `replays.events` is the unordered append-only event stream; `replays.meta` carries `startedAt`, `terrainResource`, `friendlyFactionKey` etc. (see `ReplayMeta` in `web/src/lib/replay.ts`). The recorder keeps appending to the same row throughout the session (`UPDATE replays SET events = events || $1`). Short codes are 6 chars from a curated alphabet (`src/lib/code.ts`). **The server mints a fresh code per POST** and the client reads the returned `{ code }` to show the commander. Client-specified codes are NOT accepted (removed 2026-07-19 along with page auth — with an unauthenticated endpoint, upsert-by-code would make every leaked plan code a write capability).
 
@@ -396,6 +403,16 @@ The web tool POSTs plans with:
 The mod's `TS_OpsPlan`, `TS_OpsPlanMarker`, and `TS_OpsPlanLine` `JsonApiStruct` classes must stay in sync with the fields the web tool emits. Unregistered JSON keys are silently ignored — convenient, but means a renamed field fails silently on the mod side.
 
 **Line schema is deliberately engine-unit-native.** `widthM` is world meters (not the web UI's 1-5 slider index) and `colorHex` is an sRGB hex string (not a palette name like `RED`). That keeps the mod out of the business of replicating UI mappings. `points` is flat `[x0, y0, x1, y1, ...]` because Enfusion's `JsonApiStruct` handles `ref array<float>` cleanly; nested tuples (`[[x,y],...]`) would force a side struct.
+
+## TS Hub hand-off (2026-10-09)
+
+The hub (`../ts-hub`) opens the planner with `?mission=<id>[&plan=<code>][&key=<secret>][&event=<id>]` (`lib/hubLink.ts`). On load (after localStorage hydration) the page fetches `<hub>/api/missions/<id>/planner` → `{ id, name, mapKey, layer }`, switches to that map, replaces the imported `.layer` channel with the mission's Markers.layer, and loads `plan` if given. `key` makes later pushes versions of that hub plan: it's stripped from the URL, kept in `ts-ops-planner-hub-v1`, and sent as `planKey`; `POST /api/plans` stores only `sha256(planKey)` in `plans.lineage` (never in `data`, which GET returns publicly — a leaked code mustn't let anyone push a fake "new version"). The hub lists versions with `GET /api/plans?lineage=<hash>,…`. Pushes also carry `mapKey` and `mission` (ignored by the mod).
+
+- Same key as the canvas already holds → drawn work is kept; a newer pushed version only replaces it if there's nothing unpushed (else confirm). Any other link replaces the canvas, confirming first when there's unpushed work. "Unpushed" = `savedCode` is null, persisted as `ts-ops-planner-saved-code-v1` (every edit clears it).
+- Leaflet isn't mounted while the link resolves (`hubHold`): a map swap mid opening zoom animation throws `_leaflet_pos`.
+- The sidebar card above Push names the hub plan (✕ detaches: later pushes stay out of the hub); the pushed dialog links back.
+- `NEXT_PUBLIC_HUB_URL` defaults to `http://localhost:3010` in dev; the production default `https://hub.tacticalshift.ru` is a placeholder until the hub is deployed.
+- **Replay overlay is its own state** (`replayOverlay`): the Plan toggle in replay mode shows the session's plan plus its mission's Markers.layer, never the planning canvas (which it used to reuse — so a layer only showed if one happened to be imported for planning, and loading a replay's plan overwrote the canvas). Plan = the `/syncplan` stamp, else the hub link's `&plan=` (hub replay links are `?replay=CODE&mission=<id>&plan=<code>`; both params apply to that replay only and are dropped from the URL when another one is loaded). Layer = the link's `&mission=`, else the plan's own `mission` field.
 
 ## The two marker channels — do not conflate them
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { isValidCode } from "@/lib/code";
+import { DEV_PLAN_STORE, devGetPlan } from "@/lib/devPlans";
 
 export async function GET(
   _req: NextRequest,
@@ -15,9 +16,11 @@ export async function GET(
     );
   }
 
-  const result = await sql`
-    SELECT data FROM plans WHERE code = ${code}
-  `;
+  const result = DEV_PLAN_STORE
+    ? [await devGetPlan(code)].filter(Boolean).map((data) => ({ data }))
+    : await sql`
+        SELECT data FROM plans WHERE code = ${code}
+      `;
 
   if (result.length === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
