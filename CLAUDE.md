@@ -298,7 +298,7 @@ Events are an unordered append-only stream tagged by `type`:
 
 | type | shape (relevant fields) |
 |---|---|
-| `player_join` | `{playerId, playerGuid, name}` |
+| `player_join` | `{playerId, playerGuid, name}` — `playerGuid` = the Bohemia account ID, readable only after the backend verifies the player, so a dedicated server sends the join twice: at connect (empty ID) and at `OnPlayerAuditSuccess` (with it). Readers key by `playerId`, latest wins. Every recording before the 2026-10-09 mod fix has empty IDs |
 | `char_register` | `{charId, factionKey, isPlayerControlled, factionColor}` — `factionColor` is `0xRRGGBB`, sourced from `Faction.GetFactionColor()` |
 | `possess` | `{playerId, charId}` |
 | `move` | `{charId, x, z, yaw}` — 2D, `y` (height) dropped |
