@@ -53,6 +53,7 @@ import {
   type MilitaryType,
 } from "@/lib/militaryLibrary";
 import { MAPS, DEFAULT_MAP, findMap } from "@/lib/maps";
+import { findColor, findIcon, LINE_WIDTH_METERS, markerRenderable, polygonRenderable } from "@/lib/planRender";
 import { ImportDialog } from "@/components/ImportDialog";
 import { HelpDialog } from "@/components/HelpDialog";
 import {
@@ -157,13 +158,6 @@ const REPLAY_SPEEDS = [1, 4, 8, 16] as const;
 const EVENT_LOG_PREROLL_MS = 2000;
 // Slider width (1-5) → world thickness in meters. Lines render at these
 // metric widths and scale with zoom (see MapClient.metersToWeight).
-const LINE_WIDTH_METERS: Record<LineWidth, number> = {
-  1: 2,
-  2: 4,
-  3: 8,
-  4: 12,
-  5: 16,
-};
 // Fixed pixel preview used only in the width-picker UI (not the map).
 function lineWidthPreviewPx(w: LineWidth): number {
   return 2 + (w - 1) * 2; // 2, 4, 6, 8, 10
@@ -198,17 +192,6 @@ type MilitaryPlaced = BasePlaced & {
 };
 
 type PlacedMarker = CustomPlaced | MilitaryPlaced;
-
-function findIcon(category: string, quad: string): IconEntry {
-  return (
-    ICONS.find((i) => i.category === category && i.quad === quad) ??
-    DEFAULT_ICON
-  );
-}
-
-function findColor(name: string): ColorEntry {
-  return COLORS.find((c) => c.name === name) ?? DEFAULT_COLOR;
-}
 
 // Most-used markers surfaced inline in the "Favorites" tab. Order defines the
 // 3x4 grid reading left-to-right, top-to-bottom.
@@ -1275,31 +1258,7 @@ export default function Page() {
   // imported markers render with readOnly=true so MapClient skips selection,
   // drag, and event handlers for them.
   function toRenderable(m: PlacedMarker, readOnly: boolean): RenderableMarker {
-    const base = {
-      id: m.id,
-      worldX: m.worldX,
-      worldY: m.worldY,
-      rotation: m.rotation,
-      selected: !readOnly && m.id === selectedId,
-      readOnly,
-    };
-    if (m.kind === "military") {
-      return {
-        ...base,
-        kind: "military",
-        iconUrl: militaryIconUrl(m.faction, m.type),
-        label: m.text.trim(),
-      };
-    }
-    const ic = findIcon(m.iconCategory, m.iconQuad);
-    const co = findColor(m.colorName);
-    return {
-      ...base,
-      kind: "custom",
-      icon: ic,
-      color: co.hex,
-      label: m.text.trim(),
-    };
+    return markerRenderable(m, readOnly, !readOnly && m.id === selectedId);
   }
 
   // Imported first so placed markers render on top when positions collide.
@@ -1317,16 +1276,7 @@ export default function Page() {
     ...shown.markers.map((m) => toRenderable(m, planReadOnly)),
   ];
 
-  const renderablePolygons: RenderablePolygon[] = shown.polygons.map((p) => ({
-    id: p.id,
-    points: p.points,
-    fillColor: p.fillColor,
-    fillOpacity: p.fillOpacity,
-    strokeColor: p.strokeColor,
-    strokeOpacity: p.strokeOpacity,
-    strokeWidth: p.strokeWidth,
-    fillOutside: p.fillOutside,
-  }));
+  const renderablePolygons: RenderablePolygon[] = shown.polygons.map(polygonRenderable);
 
   // Renderable lines for the map: append in-progress draft rubber-band if drafting.
   const renderableLines: RenderableLine[] = shown.lines.map((l) => ({

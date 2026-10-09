@@ -248,6 +248,8 @@ export type MapApi = {
    *  reports a garbage viewport that would poison the 3D handoff. */
   getView: () => { x: number; z: number; radius: number } | null;
   fitWholeMap: () => void;
+  /** Frame a world-coords box (2D only — the embed opens on the plan). */
+  fitArea?: (minX: number, minY: number, maxX: number, maxY: number) => void;
 };
 
 /** Publishes the MapApi and keeps a live map handle for the HUD buttons.
@@ -275,6 +277,14 @@ function ApiBridge({
         return { x: c.lng, z: c.lat, radius };
       },
       fitWholeMap: () => map.fitBounds(bounds, { padding: [20, 20] }),
+      fitArea: (minX, minY, maxX, maxY) =>
+        map.fitBounds(
+          [
+            [minY, minX],
+            [maxY, maxX],
+          ],
+          { padding: [40, 40] },
+        ),
     });
     return () => {
       if (mapRef.current === map) mapRef.current = null;
@@ -971,6 +981,7 @@ export default function MapClient({
   onToggleView,
   satLayer = false,
   onToggleSat,
+  showControls = false,
 }: {
   mapConfig: MapConfig;
   /** Global web-only marker-label text color. "black" reads on light terrain;
@@ -1054,6 +1065,8 @@ export default function MapClient({
   /** Satellite basemap on top of the topo tiles (maps with MapConfig.sat only). */
   satLayer?: boolean;
   onToggleSat?: () => void;
+  /** The HUD cluster without a 3D button (the read-only embed has no 3D view). */
+  showControls?: boolean;
 }) {
   const selectedMarker = markers.find((m) => m.selected) ?? null;
   const [zoom, setZoom] = useState<number>(-4);
@@ -1490,7 +1503,7 @@ export default function MapClient({
     {/* Top-right HUD (zoom ± / fit / 3D). A sibling of MapContainer, not a
         child — Leaflet would swallow its pointer events otherwise. Replaces
         the old Leaflet ZoomControl. */}
-    {onToggleView && (
+    {(onToggleView || showControls) && (
       <MapViewControls
         onZoomIn={() => mapInstRef.current?.zoomIn()}
         onZoomOut={() => mapInstRef.current?.zoomOut()}
@@ -1502,6 +1515,7 @@ export default function MapClient({
         satAvailable={!!mapConfig.sat}
         satLayer={satLayer}
         onToggleSat={onToggleSat}
+        alwaysShown={showControls}
       />
     )}
     </div>

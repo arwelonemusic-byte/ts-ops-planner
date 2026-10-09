@@ -10,12 +10,15 @@ type Props = {
   onZoomOut: () => void;
   onFit: () => void;
   view3D: boolean;
-  onToggleView: () => void;
+  /** Absent → no 3D button. */
+  onToggleView?: () => void;
   /** Satellite basemap toggle — the button renders only when the map ships a
    *  satellite pyramid (MapConfig.sat). */
   satAvailable?: boolean;
   satLayer?: boolean;
   onToggleSat?: () => void;
+  /** Also on narrow screens — an embed is narrow even on desktop. */
+  alwaysShown?: boolean;
 };
 
 const BTN =
@@ -30,10 +33,11 @@ export default function MapViewControls({
   satAvailable,
   satLayer,
   onToggleSat,
+  alwaysShown = false,
 }: Props) {
   const { t } = useT();
   return (
-    <div className="max-md:hidden absolute top-4 right-4 z-[1000] flex flex-col gap-px rounded-[8px] overflow-hidden shadow-[0px_16px_32px_0px_rgba(0,0,0,0.4)]">
+    <div className={`${alwaysShown ? "" : "max-md:hidden"} absolute top-4 right-4 z-[1000] flex flex-col gap-px rounded-[8px] overflow-hidden shadow-[0px_16px_32px_0px_rgba(0,0,0,0.4)]`}>
       <button
         type="button"
         aria-label={t("view.zoomIn")}
@@ -74,15 +78,17 @@ export default function MapViewControls({
           SAT
         </button>
       )}
-      <button
-        type="button"
-        aria-label={t(view3D ? "view.2d" : "view.3d")}
-        title={t(view3D ? "view.2d" : "view.3d")}
-        onClick={onToggleView}
-        className={`${BTN} text-[11px] font-semibold ${view3D ? "text-[#f4db50]" : "text-white/70"}`}
-      >
-        3D
-      </button>
+      {onToggleView && (
+        <button
+          type="button"
+          aria-label={t(view3D ? "view.2d" : "view.3d")}
+          title={t(view3D ? "view.2d" : "view.3d")}
+          onClick={onToggleView}
+          className={`${BTN} text-[11px] font-semibold ${view3D ? "text-[#f4db50]" : "text-white/70"}`}
+        >
+          3D
+        </button>
+      )}
     </div>
   );
 }
