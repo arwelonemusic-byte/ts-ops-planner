@@ -157,6 +157,7 @@ const TERRAIN_FOLDER_TO_MAP_KEY: Record<string, string> = {
   eden: "everon",
   cain: "kolguyev",
   chernot: "chernarus",
+  a2_t: "chernarus", // Chernarus Minus 2.1.3 renamed its world folder ChernoT → A2_T
   zarichne: "zarichne",
   zargabad: "zargabad",
   zargabadempty: "zargabad", // "ZargabadEmpty" variant world reuses the Zargabad map
