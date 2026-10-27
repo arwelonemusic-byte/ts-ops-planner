@@ -176,8 +176,9 @@ const TERRAIN_FOLDER_TO_MAP_KEY: Record<string, string> = {
   kunar: "kunar",
   merakisland: "merak", // Merak Island ships under terrain folder "MerakIsland"
   mogadishu: "mogadishu",
-  // Ships without the `worlds/` prefix; folder name contains a space.
+  // Ship without the `worlds/` prefix (terrain at the archive root).
   "west zagoria": "westzagoria",
+  novka_terrain: "novka",
 };
 
 // worldFileName → maps.ts key. Higher-precision override for missions whose
